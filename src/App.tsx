@@ -2048,25 +2048,124 @@ export default function App() {
 
         {/* 5. VIEW: EGREGORA CHAT */}
         {activeTab === "egregora" && (
-          <div className="bg-[#120f24] border border-[#2b244d] rounded-2xl p-8 text-center space-y-6 shadow-xl animate-fadeIn max-w-lg mx-auto my-12" id="egregora-placeholder-view">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#dfb15b] to-[#7c3aed] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#dfb15b]/10 animate-pulse">
-              <Sparkles className="w-8 h-8" />
+          <div className="bg-[#120f24] border border-[#dfb15b]/30 rounded-2xl overflow-hidden flex flex-col h-[75vh] shadow-[0_10px_40px_rgba(0,0,0,0.6)] animate-fadeIn" id="egregora-fullpage-chat">
+            {/* Header info bar */}
+            <div className="p-4 bg-[#080612]/90 border-b border-[#2b244d] flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-purple-900/40 border border-[#7c3aed] flex items-center justify-center text-purple-300 shadow-md">
+                  <Sparkles className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-sm font-bold text-[#dfb15b] tracking-wider">L'Egregora del Tempio</h3>
+                  <p className="text-[10px] text-gray-400 font-mono">Consulente Ermetico • llama-3.3-70b-versatile</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={clearChat}
+                  className="text-xs text-gray-400 hover:text-white underline font-serif cursor-pointer px-2 py-1 rounded hover:bg-white/5 transition-all"
+                >
+                  Azzera Memoria
+                </button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <h2 className="font-serif text-lg font-bold text-[#dfb15b] tracking-wider">L'Egregora del Tempio</h2>
-              <p className="text-xs text-gray-300 leading-relaxed max-w-sm mx-auto">
-                L'Egregora è ora attiva ed è accessibile come assistente fluttuante classico in basso a destra dello schermo, visibile in qualsiasi momento da ogni sezione del Grimorio.
-              </p>
+
+            {/* Chat list */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-4 text-sm bg-[#0b081a]/30" id="fullpage-chat-container">
+              {chatHistory.map((msg) => (
+                <div key={msg.id} className={`flex items-start ${msg.role === "user" ? "justify-end space-x-3" : "space-x-3"}`}>
+                  {msg.role !== "user" && (
+                    <div className="w-8 h-8 rounded-full bg-[#120f24] border border-[#dfb15b]/45 flex items-center justify-center text-[#dfb15b] shrink-0 mt-0.5 shadow-sm">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                  )}
+
+                  <div className={`p-3.5 rounded-2xl max-w-[85%] leading-relaxed shadow-sm ${
+                    msg.role === "user"
+                      ? "bg-[#dfb15b]/10 border border-[#dfb15b]/45 text-gray-100 rounded-tr-none font-serif"
+                      : msg.isError 
+                        ? "bg-red-950/40 border border-red-500/40 text-red-200 rounded-tl-none font-mono text-xs"
+                        : "bg-[#080612] border border-[#2b244d]/80 text-gray-200 rounded-tl-none font-serif"
+                  }`}>
+                    {msg.text}
+                    
+                    {/* TTS controls */}
+                    {msg.role === "model" && !msg.isError && (
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          onClick={() => speakMessage(msg.text, msg.id)}
+                          className={`p-1.5 rounded-md text-gray-400 hover:text-[#dfb15b] transition-all cursor-pointer ${
+                            speakingMessageId === msg.id ? "text-amber-400 bg-white/5 animate-pulse" : "hover:bg-white/5"
+                          }`}
+                          title={speakingMessageId === msg.id ? "Ferma Lettura" : "Ascolta Risposta"}
+                        >
+                          {speakingMessageId === msg.id ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {msg.role === "user" && (
+                    <div className="w-8 h-8 rounded-full bg-[#dfb15b] text-[#080612] flex items-center justify-center font-bold text-xs font-serif shrink-0 mt-0.5 shadow-sm">
+                      OP
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {isChatting && (
+                <div className="flex items-start space-x-3">
+                  <div className="w-8 h-8 rounded-full bg-[#120f24] border border-[#7c3aed]/50 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 animate-spin">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="bg-[#080612]/80 border border-[#2b244d]/80 p-3.5 rounded-2xl rounded-tl-none text-gray-400 italic font-mono text-xs">
+                    L'Egregora sta consultando i transiti astrali...
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <button
-              onClick={() => { setIsChatOpen(true); playKeyClick(500); }}
-              className="px-6 py-3 bg-gradient-to-r from-[#dfb15b] to-amber-600 text-[#080612] font-serif font-bold text-xs rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-2"
-              id="btn-open-floating-chat-direct"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Apri Chat Fluttuante Classica</span>
-            </button>
+
+            {/* Input Bar */}
+            <div className="p-4 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2.5">
+              {/* PDF Download Button */}
+              <button
+                onClick={downloadChatPDF}
+                disabled={chatHistory.length <= 1}
+                className="p-3 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-xl disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d]"
+                title="Scarica Chat in PDF"
+              >
+                <Download className="w-5 h-5" />
+              </button>
+
+              {/* Speech Input Button */}
+              <button
+                onClick={startListening}
+                className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                  isListening 
+                    ? "bg-red-500/15 text-red-400 border-red-500 animate-pulse" 
+                    : "bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 border-[#2b244d]"
+                }`}
+                title={isListening ? "Ascolto attivo... Clicca per fermare" : "Invia messaggio vocale"}
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSendChatMessage(); }}
+                placeholder="Rivolgi la tua domanda ermetica all'Egregora..."
+                className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
+              />
+              <button
+                onClick={handleSendChatMessage}
+                disabled={!chatInput.trim() || isChatting}
+                className="bg-[#dfb15b] text-[#080612] p-3 rounded-xl hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         )}
 
