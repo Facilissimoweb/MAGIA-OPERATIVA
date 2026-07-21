@@ -910,13 +910,23 @@ export default function App() {
           history: updatedHistory.slice(-10) // Send last 10 messages context
         }),
       });
+
+      if (!res.ok) {
+        throw new Error(`Il server ha risposto con stato ${res.status}`);
+      }
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Il server ha risposto con formato non valido (${contentType || "sconosciuto"})`);
+      }
+
       const data = await res.json();
       setChatHistory((prev) => [
         ...prev,
         {
           id: `m-${Date.now()}-bot`,
           role: "model",
-          text: data.response,
+          text: data.response || "L'Egregora rimane in silenzio. Verifica le tue impostazioni o riprova.",
           isError: data.isError
         }
       ]);
@@ -1577,6 +1587,18 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                   >
                     <FolderPlus className="w-3.5 h-3.5" />
                     <span className="font-serif">Apri Fascicolo Indagine</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsChatOpen(true);
+                      setChatInput(`Vorrei discutere la mia diagnosi: "${diagnosis.title}" (Archetipo ${diagnosis.archetype}). Come posso riequilibrare i miei elementi?`);
+                      playKeyClick(400);
+                    }}
+                    className="col-span-2 mt-1 w-full bg-gradient-to-r from-[#dfb15b]/15 to-[#7c3aed]/15 hover:from-[#dfb15b]/25 hover:to-[#7c3aed]/25 border border-[#dfb15b]/35 text-[#dfb15b] font-bold py-2.5 px-3 rounded-lg text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-[#dfb15b]" />
+                    <span className="font-serif">Discuti la Diagnosi con l'Egregora</span>
                   </button>
                 </div>
               </div>
@@ -2829,25 +2851,29 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
       )}
 
       {/* CLASSIC FLOATING CHAT WIDGET */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none" id="floating-chat-widget">
+      <div className={`fixed z-50 flex flex-col items-end pointer-events-none transition-all duration-300 ${
+        isChatOpen 
+          ? "inset-0 sm:inset-auto sm:bottom-6 sm:right-6 w-full h-full sm:w-auto" 
+          : "bottom-6 right-6"
+      }`} id="floating-chat-widget">
         {/* Chat window pane */}
         {isChatOpen && (
-          <div className="w-96 max-w-[calc(100vw-32px)] h-[520px] bg-[#0f0c23]/95 border border-[#dfb15b]/45 rounded-2xl flex flex-col shadow-[0_10px_30px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-md mb-4 pointer-events-auto animate-fadeIn animate-duration-300" id="egregora-chat-pane">
+          <div className="w-full sm:w-96 h-full sm:h-[520px] bg-[#0f0c23] sm:bg-[#0f0c23]/95 border-0 sm:border border-[#dfb15b]/45 rounded-none sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden backdrop-blur-md mb-0 sm:mb-4 pointer-events-auto animate-fadeIn animate-duration-300" id="egregora-chat-pane">
             {/* Header */}
-            <div className="p-3.5 bg-[#080612]/90 border-b border-[#2b244d] flex items-center justify-between">
+            <div className="p-4 sm:p-3.5 bg-[#080612]/90 border-b border-[#2b244d] flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-full bg-purple-900/30 border border-[#7c3aed] flex items-center justify-center text-purple-300">
+                <div className="w-9 h-9 sm:w-8 sm:h-8 rounded-full bg-purple-900/30 border border-[#7c3aed] flex items-center justify-center text-purple-300 shrink-0">
                   <Sparkles className="w-4 h-4 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-serif text-xs font-bold text-[#dfb15b] tracking-wider">L'Egregora dell'Arte</h3>
-                  <p className="text-[9px] text-gray-400 font-mono">llama-3.3-70b-versatile</p>
+                  <h3 className="font-serif text-sm sm:text-xs font-bold text-[#dfb15b] tracking-wider">L'Egregora dell'Arte</h3>
+                  <p className="text-[10px] sm:text-[9px] text-gray-400 font-mono">llama-3.3-70b-versatile • Online</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={clearChat}
-                  className="text-[10px] text-gray-400 hover:text-white underline font-serif cursor-pointer p-1 rounded hover:bg-white/5 transition-all"
+                  className="text-xs sm:text-[10px] text-gray-400 hover:text-white underline font-serif cursor-pointer p-1.5 sm:p-1 rounded hover:bg-white/5 transition-all"
                   title="Azzera Memoria"
                   id="btn-clear-chat"
                 >
@@ -2855,30 +2881,31 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                 </button>
                 <button
                   onClick={() => { setIsChatOpen(false); playKeyClick(300); }}
-                  className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs bg-[#120f24] text-gray-300 hover:text-white hover:bg-white/10 border border-[#2b244d] transition-all cursor-pointer"
                   id="btn-close-chat"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4 text-[#dfb15b]" />
+                  <span className="font-serif hidden xs:inline">Chiudi</span>
                 </button>
               </div>
             </div>
 
             {/* Chat List */}
-            <div className="flex-1 p-3.5 overflow-y-auto space-y-3.5 text-xs bg-[#0b081a]/40" id="chat-messages-container">
+            <div className="flex-1 p-4 sm:p-3.5 overflow-y-auto space-y-4 text-sm sm:text-xs bg-[#0b081a]/40" id="chat-messages-container">
               {chatHistory.map((msg) => (
                 <div key={msg.id} className={`flex items-start ${msg.role === "user" ? "justify-end space-x-2" : "space-x-2"}`}>
                   {msg.role !== "user" && (
-                    <div className="w-7 h-7 rounded-full bg-[#120f24] border border-[#dfb15b]/40 flex items-center justify-center text-[#dfb15b] shrink-0 mt-0.5 shadow-sm">
-                      <Sparkles className="w-3.5 h-3.5" />
+                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-[#120f24] border border-[#dfb15b]/40 flex items-center justify-center text-[#dfb15b] shrink-0 mt-0.5 shadow-sm">
+                      <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </div>
                   )}
 
-                  <div className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${
+                  <div className={`p-3.5 sm:p-3 rounded-xl max-w-[88%] sm:max-w-[85%] leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-[#dfb15b]/10 border border-[#dfb15b]/45 text-gray-150 rounded-tr-none font-serif"
+                      ? "bg-[#dfb15b]/10 border border-[#dfb15b]/45 text-gray-150 rounded-tr-none font-serif text-[15px] sm:text-xs"
                       : msg.isError 
-                        ? "bg-red-950/40 border border-red-500/40 text-red-200 rounded-tl-none font-mono text-[11px]"
-                        : "bg-[#080612] border border-[#2b244d]/80 text-gray-300 rounded-tl-none font-serif"
+                        ? "bg-red-950/40 border border-red-500/40 text-red-200 rounded-tl-none font-mono text-xs sm:text-[11px]"
+                        : "bg-[#080612] border border-[#2b244d]/80 text-gray-300 rounded-tl-none font-serif text-[15px] sm:text-xs"
                   }`}>
                     {msg.text}
                     
@@ -2893,14 +2920,14 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                           title={speakingMessageId === msg.id ? "Ferma Lettura" : "Ascolta Risposta"}
                           id={`btn-tts-${msg.id}`}
                         >
-                          {speakingMessageId === msg.id ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                          {speakingMessageId === msg.id ? <VolumeX className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> : <Volume2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
                         </button>
                       </div>
                     )}
                   </div>
 
                   {msg.role === "user" && (
-                    <div className="w-7 h-7 rounded-full bg-[#dfb15b] text-[#080612] flex items-center justify-center font-bold text-[9px] font-serif shrink-0 mt-0.5 shadow-sm">
+                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-[#dfb15b] text-[#080612] flex items-center justify-center font-bold text-[10px] sm:text-[9px] font-serif shrink-0 mt-0.5 shadow-sm">
                       OP
                     </div>
                   )}
@@ -2909,10 +2936,10 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
 
               {isChatting && (
                 <div className="flex items-start space-x-2">
-                  <div className="w-7 h-7 rounded-full bg-[#120f24] border border-[#7c3aed]/50 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 animate-spin">
-                    <Sparkles className="w-3.5 h-3.5" />
+                  <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-[#120f24] border border-[#7c3aed]/50 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 animate-spin">
+                    <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                   </div>
-                  <div className="bg-[#080612]/80 border border-[#2b244d]/80 p-3 rounded-xl rounded-tl-none text-gray-400 italic font-mono text-[10px]">
+                  <div className="bg-[#080612]/80 border border-[#2b244d]/80 p-3 rounded-xl rounded-tl-none text-gray-400 italic font-mono text-xs sm:text-[10px]">
                     L'Egregora sta consultando i transiti astrali...
                   </div>
                 </div>
@@ -2922,22 +2949,22 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
             </div>
 
             {/* Input Bar */}
-            <div className="p-3 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2">
+            <div className="p-4 sm:p-3 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2 pb-6 sm:pb-3 shrink-0">
               {/* PDF Download Button */}
               <button
                 onClick={downloadChatPDF}
                 disabled={chatHistory.length <= 1}
-                className="p-2.5 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d]"
+                className="p-3 sm:p-2.5 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d] shrink-0"
                 title="Scarica Chat PDF"
                 id="btn-download-chat-pdf"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
 
               {/* Speech Input Button */}
               <button
                 onClick={startListening}
-                className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+                className={`p-3 sm:p-2.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
                   isListening 
                     ? "bg-red-500/10 text-red-400 border-red-500 animate-pulse" 
                     : "bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 border-[#2b244d]"
@@ -2945,7 +2972,7 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                 title={isListening ? "Ascolto attivo... Premi per fermare" : "Invia messaggio vocale"}
                 id="btn-voice-input"
               >
-                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {isListening ? <MicOff className="w-5 h-5 sm:w-4 sm:h-4" /> : <Mic className="w-5 h-5 sm:w-4 sm:h-4" />}
               </button>
 
               <input
@@ -2954,16 +2981,16 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSendChatMessage(); }}
                 placeholder="Chiedi all'Egregora..."
-                className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-lg px-3 py-2 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
+                className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-lg px-3.5 py-2.5 sm:px-3 sm:py-2 text-[15px] sm:text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
                 id="chat-text-input"
               />
               <button
                 onClick={handleSendChatMessage}
                 disabled={!chatInput.trim() || isChatting}
-                className="bg-[#dfb15b] text-[#080612] p-2.5 rounded-lg hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
+                className="bg-[#dfb15b] text-[#080612] p-3 sm:p-2.5 rounded-lg hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
                 id="btn-send-chat"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
