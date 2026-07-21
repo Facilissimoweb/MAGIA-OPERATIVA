@@ -2218,9 +2218,18 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
             </div>
 
             {/* Input Bar */}
-            <div className="p-4 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2.5">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (chatInput.trim() && !isChatting) {
+                  handleSendChatMessage();
+                }
+              }}
+              className="p-4 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2.5"
+            >
               {/* PDF Download Button */}
               <button
+                type="button"
                 onClick={downloadChatPDF}
                 disabled={chatHistory.length <= 1}
                 className="p-3 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-xl disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d]"
@@ -2231,6 +2240,7 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
 
               {/* Speech Input Button */}
               <button
+                type="button"
                 onClick={startListening}
                 className={`p-3 rounded-xl border transition-all cursor-pointer ${
                   isListening 
@@ -2246,18 +2256,17 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSendChatMessage(); }}
                 placeholder="Rivolgi la tua domanda ermetica all'Egregora..."
                 className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
               />
               <button
-                onClick={handleSendChatMessage}
+                type="submit"
                 disabled={!chatInput.trim() || isChatting}
                 className="bg-[#dfb15b] text-[#080612] p-3 rounded-xl hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
               >
                 <Send className="w-5 h-5" />
               </button>
-            </div>
+            </form>
           </div>
         )}
 
@@ -2949,9 +2958,18 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
             </div>
 
             {/* Input Bar */}
-            <div className="p-4 sm:p-3 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2 pb-6 sm:pb-3 shrink-0">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (chatInput.trim() && !isChatting) {
+                  handleSendChatMessage();
+                }
+              }}
+              className="p-4 sm:p-3 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2 pb-6 sm:pb-3 shrink-0 w-full"
+            >
               {/* PDF Download Button */}
               <button
+                type="button"
                 onClick={downloadChatPDF}
                 disabled={chatHistory.length <= 1}
                 className="p-3 sm:p-2.5 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d] shrink-0"
@@ -2963,6 +2981,7 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
 
               {/* Speech Input Button */}
               <button
+                type="button"
                 onClick={startListening}
                 className={`p-3 sm:p-2.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
                   isListening 
@@ -2979,20 +2998,19 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSendChatMessage(); }}
                 placeholder="Chiedi all'Egregora..."
                 className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-lg px-3.5 py-2.5 sm:px-3 sm:py-2 text-[15px] sm:text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
                 id="chat-text-input"
               />
               <button
-                onClick={handleSendChatMessage}
+                type="submit"
                 disabled={!chatInput.trim() || isChatting}
                 className="bg-[#dfb15b] text-[#080612] p-3 sm:p-2.5 rounded-lg hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
                 id="btn-send-chat"
               >
                 <Send className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
-            </div>
+            </form>
           </div>
         )}
 
