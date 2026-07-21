@@ -37,8 +37,13 @@ import {
   Printer,
   Mail,
   MessageCircle,
-  Menu
+  Menu,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX
 } from "lucide-react";
+import { jsPDF } from "jspdf";
 import { getMoonPhaseData, MoonPhaseData } from "./utils/lunar";
 import { GLOSSARY_DATABASE } from "./data/glossary";
 import { Diagnosis, Ritual, Investigation, TimelineStep, MediaItem, ChatMessage } from "./types";
@@ -135,6 +140,11 @@ export default function App() {
   });
   const [chatInput, setChatInput] = useState("");
   const [isChatting, setIsChatting] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   // Saved Rituals (Grimoire) State (Persistent)
   const [savedRituals, setSavedRituals] = useState<Ritual[]>(() => {
@@ -895,14 +905,179 @@ export default function App() {
         {
           id: `m-${Date.now()}-bot`,
           role: "model",
-          text: data.response
+          text: data.response,
+          isError: data.isError
         }
       ]);
       playKeyClick(500);
-    } catch (e) {
+
+      // Auto scroll to bottom of the chat list
+      setTimeout(() => {
+        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    } catch (e: any) {
       console.error("Chat error:", e);
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          id: `m-${Date.now()}-bot-err`,
+          role: "model",
+          text: `Errore di Connessione: ${e.message || "Impossibile contattare l'Egregora. Verifica la tua connessione di rete."}`,
+          isError: true
+        }
+      ]);
+      // Auto scroll to bottom of the chat list
+      setTimeout(() => {
+        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     } finally {
       setIsChatting(false);
+    }
+  };
+
+  // Voice input recognition helpers (Assicura audio input)
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Il tuo browser o dispositivo non supporta l'inserimento vocale. Prova ad usare Chrome, Safari o Edge.");
+      return;
+    }
+
+    if (isListening) {
+      stopListening();
+      return;
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = "it-IT";
+
+      rec.onstart = () => {
+        setIsListening(true);
+        playKeyClick(200);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setChatInput((prev) => (prev ? prev + " " + transcript : transcript));
+      };
+
+      rec.onerror = (e: any) => {
+        console.error("Speech recognition error:", e);
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (err) {
+      console.error("Failed to start speech recognition:", err);
+      setIsListening(false);
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+  };
+
+  // Text-to-speech helpers (Ascolta risposta)
+  const speakMessage = (text: string, msgId: string) => {
+    if (speakingMessageId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel(); // Stoppa l'audio corrente
+
+    const cleanText = text.replace(/[*#_`]/g, ""); // Pulisce i caratteri markdown prima della lettura vocale
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = "it-IT";
+    utterance.rate = 1.05;
+
+    utterance.onend = () => {
+      setSpeakingMessageId(null);
+    };
+
+    utterance.onerror = () => {
+      setSpeakingMessageId(null);
+    };
+
+    setSpeakingMessageId(msgId);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // PDF Export for chat (Scarica la chat in PDF)
+  const downloadChatPDF = () => {
+    try {
+      const doc = new jsPDF();
+
+      // Intestazione con lo stile "Arte Ermetica"
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(124, 58, 237); // Colore viola
+      doc.text("IL DIALOGO CON L'EGREGORA", 20, 20);
+
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Documento ufficiale generato il: ${new Date().toLocaleDateString("it-IT")} alle ${new Date().toLocaleTimeString("it-IT")}`, 20, 26);
+      doc.text(`Firma dell'Operatore: ${operatorSignature}`, 20, 31);
+
+      // Linea divisoria
+      doc.setDrawColor(226, 232, 240);
+      doc.line(20, 35, 190, 35);
+
+      let yPos = 45;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+
+      chatHistory.forEach((msg) => {
+        if (yPos > 260) {
+          doc.addPage();
+          yPos = 20;
+        }
+
+        const roleHeader = msg.role === "user" ? "OPERATORE (TU):" : "L'EGREGORA (AI):";
+        doc.setFont("helvetica", "bold");
+        if (msg.role === "user") {
+          doc.setTextColor(17, 24, 39);
+        } else {
+          doc.setTextColor(124, 58, 237);
+        }
+        doc.text(roleHeader, 20, yPos);
+        yPos += 5.5;
+
+        doc.setFont("times", "normal");
+        doc.setTextColor(51, 65, 85);
+
+        // Splitta il testo per farlo stare nei margini del foglio A4
+        const lines = doc.splitTextToSize(msg.text, 170);
+        lines.forEach((line: string) => {
+          if (yPos > 275) {
+            doc.addPage();
+            yPos = 20;
+          }
+          doc.text(line, 20, yPos);
+          yPos += 5.5;
+        });
+
+        yPos += 4.5; // Margine tra i messaggi
+      });
+
+      doc.save(`Dialogo_Egregora_${new Date().toISOString().split("T")[0]}.pdf`);
+      playMysticChime();
+    } catch (err: any) {
+      console.error("PDF generation failed:", err);
+      alert(`Impossibile generare il PDF: ${err.message || err}`);
     }
   };
 
@@ -1056,11 +1231,17 @@ export default function App() {
                   { id: "grimorio", label: "Grimorio Formule", icon: Bookmark, desc: "Custodia Rituali Sacri" }
                 ].map((item) => {
                   const Icon = item.icon;
-                  const isActive = activeTab === item.id;
+                  const isActive = item.id === "egregora" ? isChatOpen : activeTab === item.id;
                   return (
                     <button
                       key={item.id}
                       onClick={() => {
+                        if (item.id === "egregora") {
+                          setIsMenuOpen(false);
+                          setIsChatOpen(true);
+                          playKeyClick(400);
+                          return;
+                        }
                         setActiveTab(item.id as any);
                         setSelectedInvId(null);
                         setIsMenuOpen(false);
@@ -1145,28 +1326,12 @@ export default function App() {
               <span className="font-semibold font-mono">{todayLunarData.phaseName.split(" ")[0]} {todayLunarData.illumination}%</span>
             </button>
 
-            {/* AI Engine Switcher */}
-            <button
-              onClick={() => {
-                setEngine(engine === "gemini" ? "local" : "gemini");
-                playKeyClick(engine === "gemini" ? 300 : 450);
-              }}
-              className={`text-[10px] px-2.5 py-1 rounded-full border flex items-center space-x-1.5 transition-all duration-300 ${
-                engine === "gemini"
-                  ? "border-[#7c3aed] bg-[#7c3aed]/10 text-purple-300"
-                  : "border-[#2b244d] bg-[#120f24] text-gray-400 hover:border-[#dfb15b]"
-              }`}
-              title="Cambia Engine AI"
-            >
-              <Cpu className="w-3 h-3" />
-              <span className="font-medium font-mono">{engine === "gemini" ? "Gemini 3.5" : "Egregora"}</span>
-            </button>
           </div>
         </div>
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 max-w-xl w-full mx-auto p-4 space-y-5 overflow-x-hidden">
+      <main className="flex-1 max-w-xl w-full mx-auto px-4 py-10 pb-48 space-y-12 overflow-x-hidden">
 
         {/* 1. VIEW: DIAGNOSI */}
         {activeTab === "diagnosi" && (
@@ -1883,83 +2048,25 @@ export default function App() {
 
         {/* 5. VIEW: EGREGORA CHAT */}
         {activeTab === "egregora" && (
-          <div className="bg-[#120f24] border border-[#2b244d] rounded-xl overflow-hidden flex flex-col h-[70vh] shadow-xl animate-fadeIn">
+          <div className="bg-[#120f24] border border-[#2b244d] rounded-2xl p-8 text-center space-y-6 shadow-xl animate-fadeIn max-w-lg mx-auto my-12" id="egregora-placeholder-view">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#dfb15b] to-[#7c3aed] text-white flex items-center justify-center mx-auto shadow-lg shadow-[#dfb15b]/10 animate-pulse">
+              <Sparkles className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="font-serif text-lg font-bold text-[#dfb15b] tracking-wider">L'Egregora del Tempio</h2>
+              <p className="text-xs text-gray-300 leading-relaxed max-w-sm mx-auto">
+                L'Egregora è ora attiva ed è accessibile come assistente fluttuante classico in basso a destra dello schermo, visibile in qualsiasi momento da ogni sezione del Grimorio.
+              </p>
+            </div>
             
-            {/* Header info bar */}
-            <div className="p-3.5 bg-[#080612]/80 border-b border-[#2b244d] flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-full bg-purple-900/30 border border-[#7c3aed] flex items-center justify-center text-purple-300">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-serif text-xs font-bold text-[#dfb15b] tracking-wider">Consigliere del Tempio</h3>
-                  <p className="text-[9px] text-gray-500 font-mono">Risonanza attiva • {engine === "gemini" ? "Gemini 3.5 AI" : "Motore Locale"}</p>
-                </div>
-              </div>
-              <button
-                onClick={clearChat}
-                className="text-[10px] text-gray-400 hover:text-white underline font-serif cursor-pointer"
-              >
-                Azzera Memoria
-              </button>
-            </div>
-
-            {/* Chat list */}
-            <div className="flex-1 p-3 overflow-y-auto space-y-3.5 text-xs">
-              {chatHistory.map((msg) => (
-                <div key={msg.id} className={`flex items-start ${msg.role === "user" ? "justify-end space-x-2" : "space-x-2"}`}>
-                  {msg.role !== "user" && (
-                    <div className="w-6.5 h-6.5 rounded-full bg-[#120f24] border border-[#dfb15b]/40 flex items-center justify-center text-[#dfb15b] shrink-0 mt-0.5 shadow-sm">
-                      <Sparkles className="w-3.5 h-3.5" />
-                    </div>
-                  )}
-
-                  <div className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-[#dfb15b]/10 border border-[#dfb15b]/45 text-gray-150 rounded-tr-none font-serif"
-                      : "bg-[#080612] border border-[#2b244d]/80 text-gray-300 rounded-tl-none font-serif"
-                  }`}>
-                    {msg.text}
-                  </div>
-
-                  {msg.role === "user" && (
-                    <div className="w-6.5 h-6.5 rounded-full bg-[#dfb15b] text-[#080612] flex items-center justify-center font-bold text-[9px] font-serif shrink-0 mt-0.5 shadow-sm">
-                      OP
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isChatting && (
-                <div className="flex items-start space-x-2">
-                  <div className="w-6.5 h-6.5 rounded-full bg-[#120f24] border border-[#7c3aed]/50 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 animate-spin">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="bg-[#080612] border border-[#2b244d]/80 p-3 rounded-xl rounded-tl-none text-gray-500 italic font-mono text-[10px]">
-                    L'Egregora sta consultando i transiti astrali...
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Input Bar */}
-            <div className="p-3 bg-[#080612]/90 border-t border-[#2b244d] flex items-center gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSendChatMessage(); }}
-                placeholder="Quale corrispondenza o consiglio rituale desideri scoprire?"
-                className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-lg px-3 py-2.5 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
-              />
-              <button
-                onClick={handleSendChatMessage}
-                disabled={!chatInput.trim() || isChatting}
-                className="bg-[#dfb15b] text-[#080612] p-2.5 rounded-lg hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => { setIsChatOpen(true); playKeyClick(500); }}
+              className="px-6 py-3 bg-gradient-to-r from-[#dfb15b] to-amber-600 text-[#080612] font-serif font-bold text-xs rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-2"
+              id="btn-open-floating-chat-direct"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Apri Chat Fluttuante Classica</span>
+            </button>
           </div>
         )}
 
@@ -2163,79 +2270,6 @@ export default function App() {
 
       </main>
 
-      {/* FIXED FOOTER NAVIGATION BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#080612]/95 backdrop-blur-md border-t border-[#2b244d] max-w-xl mx-auto flex justify-around py-2.5 px-1 shadow-2xl">
-        <button
-          onClick={() => { setActiveTab("diagnosi"); setSelectedInvId(null); playKeyClick(300); }}
-          className={`flex flex-col items-center py-1 px-2.5 transition-colors duration-200 cursor-pointer ${
-            activeTab === "diagnosi" ? "text-[#dfb15b]" : "text-gray-400 hover:text-[#dfb15b]"
-          }`}
-        >
-          <Compass className="w-4 h-4" />
-          <span className="text-[8px] mt-1 font-medium font-serif tracking-wider">Diagnosi</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab("dossier"); setSelectedInvId(null); playKeyClick(300); }}
-          className={`flex flex-col items-center py-1 px-2.5 transition-colors duration-200 cursor-pointer ${
-            activeTab === "dossier" ? "text-[#dfb15b]" : "text-gray-400 hover:text-[#dfb15b]"
-          }`}
-        >
-          <FolderSearch className="w-4 h-4" />
-          <span className="text-[8px] mt-1 font-medium font-serif tracking-wider">Dossier</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab("luna"); playKeyClick(300); }}
-          className={`flex flex-col items-center py-1 px-2.5 transition-colors duration-200 cursor-pointer ${
-            activeTab === "luna" ? "text-[#dfb15b]" : "text-gray-400 hover:text-[#dfb15b]"
-          }`}
-        >
-          <Moon className="w-4 h-4" />
-          <span className="text-[8px] mt-1 font-medium font-serif tracking-wider">Luna</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab("trance"); playKeyClick(300); }}
-          className={`flex flex-col items-center py-1 px-2.5 transition-colors duration-200 cursor-pointer ${
-            activeTab === "trance" ? "text-[#dfb15b]" : "text-gray-400 hover:text-[#dfb15b]"
-          }`}
-        >
-          <Zap className="w-4 h-4" />
-          <span className="text-[8px] mt-1 font-medium font-serif tracking-wider">Trance</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab("egregora"); playKeyClick(300); }}
-          className={`flex flex-col items-center py-1 px-2.5 transition-colors duration-200 cursor-pointer ${
-            activeTab === "egregora" ? "text-[#dfb15b]" : "text-gray-400 hover:text-[#dfb15b]"
-          }`}
-        >
-          <MessageSquare className="w-4 h-4" />
-          <span className="text-[8px] mt-1 font-medium font-serif tracking-wider">Egregora</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab("glossario"); playKeyClick(300); }}
-          className={`flex flex-col items-center py-1 px-2.5 transition-colors duration-200 cursor-pointer ${
-            activeTab === "glossario" ? "text-[#dfb15b]" : "text-gray-400 hover:text-[#dfb15b]"
-          }`}
-        >
-          <Book className="w-4 h-4" />
-          <span className="text-[8px] mt-1 font-medium font-serif tracking-wider">Glossario</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab("grimorio"); playKeyClick(300); }}
-          className={`flex flex-col items-center py-1 px-2.5 transition-colors duration-200 cursor-pointer ${
-            activeTab === "grimorio" ? "text-[#dfb15b]" : "text-gray-400 hover:text-[#dfb15b]"
-          }`}
-        >
-          <Bookmark className="w-4 h-4" />
-          <span className="text-[8px] mt-1 font-medium font-serif tracking-wider">Grimorio</span>
-        </button>
-      </nav>
-
       {/* DIALOG STEP TIMELINE ADD MODAL */}
       {isStepModalOpen && (
         <div className="fixed inset-0 z-50 bg-[#080612]/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
@@ -2298,6 +2332,165 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* CLASSIC FLOATING CHAT WIDGET */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none" id="floating-chat-widget">
+        {/* Chat window pane */}
+        {isChatOpen && (
+          <div className="w-96 max-w-[calc(100vw-32px)] h-[520px] bg-[#0f0c23]/95 border border-[#dfb15b]/45 rounded-2xl flex flex-col shadow-[0_10px_30px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-md mb-4 pointer-events-auto animate-fadeIn animate-duration-300" id="egregora-chat-pane">
+            {/* Header */}
+            <div className="p-3.5 bg-[#080612]/90 border-b border-[#2b244d] flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-full bg-purple-900/30 border border-[#7c3aed] flex items-center justify-center text-purple-300">
+                  <Sparkles className="w-4 h-4 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xs font-bold text-[#dfb15b] tracking-wider">L'Egregora dell'Arte</h3>
+                  <p className="text-[9px] text-gray-400 font-mono">llama-3.3-70b-versatile</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={clearChat}
+                  className="text-[10px] text-gray-400 hover:text-white underline font-serif cursor-pointer p-1 rounded hover:bg-white/5 transition-all"
+                  title="Azzera Memoria"
+                  id="btn-clear-chat"
+                >
+                  Azzera
+                </button>
+                <button
+                  onClick={() => { setIsChatOpen(false); playKeyClick(300); }}
+                  className="p-1 rounded text-gray-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                  id="btn-close-chat"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Chat List */}
+            <div className="flex-1 p-3.5 overflow-y-auto space-y-3.5 text-xs bg-[#0b081a]/40" id="chat-messages-container">
+              {chatHistory.map((msg) => (
+                <div key={msg.id} className={`flex items-start ${msg.role === "user" ? "justify-end space-x-2" : "space-x-2"}`}>
+                  {msg.role !== "user" && (
+                    <div className="w-7 h-7 rounded-full bg-[#120f24] border border-[#dfb15b]/40 flex items-center justify-center text-[#dfb15b] shrink-0 mt-0.5 shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+
+                  <div className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-[#dfb15b]/10 border border-[#dfb15b]/45 text-gray-150 rounded-tr-none font-serif"
+                      : msg.isError 
+                        ? "bg-red-950/40 border border-red-500/40 text-red-200 rounded-tl-none font-mono text-[11px]"
+                        : "bg-[#080612] border border-[#2b244d]/80 text-gray-300 rounded-tl-none font-serif"
+                  }`}>
+                    {msg.text}
+                    
+                    {/* TTS controls */}
+                    {msg.role === "model" && !msg.isError && (
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          onClick={() => speakMessage(msg.text, msg.id)}
+                          className={`p-1 rounded text-gray-400 hover:text-[#dfb15b] transition-all cursor-pointer ${
+                            speakingMessageId === msg.id ? "text-amber-400 animate-pulse bg-white/5" : ""
+                          }`}
+                          title={speakingMessageId === msg.id ? "Ferma Lettura" : "Ascolta Risposta"}
+                          id={`btn-tts-${msg.id}`}
+                        >
+                          {speakingMessageId === msg.id ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {msg.role === "user" && (
+                    <div className="w-7 h-7 rounded-full bg-[#dfb15b] text-[#080612] flex items-center justify-center font-bold text-[9px] font-serif shrink-0 mt-0.5 shadow-sm">
+                      OP
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {isChatting && (
+                <div className="flex items-start space-x-2">
+                  <div className="w-7 h-7 rounded-full bg-[#120f24] border border-[#7c3aed]/50 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 animate-spin">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="bg-[#080612]/80 border border-[#2b244d]/80 p-3 rounded-xl rounded-tl-none text-gray-400 italic font-mono text-[10px]">
+                    L'Egregora sta consultando i transiti astrali...
+                  </div>
+                </div>
+              )}
+              
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Input Bar */}
+            <div className="p-3 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2">
+              {/* PDF Download Button */}
+              <button
+                onClick={downloadChatPDF}
+                disabled={chatHistory.length <= 1}
+                className="p-2.5 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d]"
+                title="Scarica Chat PDF"
+                id="btn-download-chat-pdf"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+
+              {/* Speech Input Button */}
+              <button
+                onClick={startListening}
+                className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+                  isListening 
+                    ? "bg-red-500/10 text-red-400 border-red-500 animate-pulse" 
+                    : "bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 border-[#2b244d]"
+                }`}
+                title={isListening ? "Ascolto attivo... Premi per fermare" : "Invia messaggio vocale"}
+                id="btn-voice-input"
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSendChatMessage(); }}
+                placeholder="Chiedi all'Egregora..."
+                className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-lg px-3 py-2 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
+                id="chat-text-input"
+              />
+              <button
+                onClick={handleSendChatMessage}
+                disabled={!chatInput.trim() || isChatting}
+                className="bg-[#dfb15b] text-[#080612] p-2.5 rounded-lg hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
+                id="btn-send-chat"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Toggle Button */}
+        <button
+          onClick={() => { setIsChatOpen(!isChatOpen); playKeyClick(400); }}
+          className="pointer-events-auto w-14 h-14 rounded-full bg-gradient-to-tr from-[#dfb15b] to-[#7c3aed] text-white flex items-center justify-center shadow-[0_4px_20px_rgba(223,177,91,0.4)] hover:scale-105 transition-all active:scale-95 cursor-pointer relative"
+          id="btn-chat-toggle"
+        >
+          {isChatOpen ? <X className="w-6 h-6 text-white" /> : <MessageCircle className="w-6 h-6 text-white" />}
+          
+          {/* Subtle indicator beacon */}
+          {!isChatOpen && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border border-[#080612]"></span>
+            </span>
+          )}
+        </button>
+      </div>
 
     </div>
   );

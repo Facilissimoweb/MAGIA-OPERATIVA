@@ -55,6 +55,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "model";
   text: string;
+  isError?: boolean;
 }
 
 export interface GlossaryItem {

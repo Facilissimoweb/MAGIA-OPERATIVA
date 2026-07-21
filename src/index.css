@@ -7,6 +7,15 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+html, body {
+  background-color: #080612;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth;
+  height: auto;
+  min-height: 100%;
+}
+
 /* Custom scrollbars for a clean premium dark UI */
 ::-webkit-scrollbar {
   width: 5px;

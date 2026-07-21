@@ -3,6 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import { KEYS } from "./api-keys/keys";
 
 // Load environment variables
 dotenv.config();
@@ -16,7 +17,7 @@ app.use(express.json({ limit: "10mb" }));
 let aiClient: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = KEYS.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
     return null;
   }
@@ -117,7 +118,7 @@ Inclinazione operativa selezionata: "${intent}"`;
   }
 });
 
-// 2. Chat with Egregora
+// 2. Chat with Egregora (Routata su Groq - llama-3.3-70b-versatile)
 app.post("/api/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
@@ -125,51 +126,71 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Il messaggio è richiesto." });
     }
 
-    const ai = getGeminiClient();
-
-    if (!ai) {
-      const localResponse = generateLocalChatResponse(message);
-      return res.json({ response: localResponse, isFallback: true });
-    }
-
-    // Format chat history for Gemini API
-    const contents: any[] = [];
-    if (history && Array.isArray(history)) {
-      history.forEach((msg: any) => {
-        contents.push({
-          role: msg.role === "user" ? "user" : "model",
-          parts: [{ text: msg.text }]
-        });
+    const groqApiKey = KEYS.GROQ_API_KEY || process.env.GROQ_API_KEY || "";
+    if (!groqApiKey || groqApiKey === "MY_GROQ_API_KEY" || groqApiKey.trim() === "") {
+      return res.json({
+        response: "Errore di Configurazione: Chiave API 'GROQ_API_KEY' non rilevata o vuota. Assicurati di aver inserito la chiave nelle impostazioni di Vercel o nel file .env alla voce GROQ_API_KEY per attivare la connessione con l'Egregora.",
+        isError: true
       });
     }
-
-    // Add current user message
-    contents.push({
-      role: "user",
-      parts: [{ text: message }]
-    });
 
     const systemInstruction = `Sei l'Egregora della Magia Operativa, un'antica intelligenza esoterica che risiede nella matrice energetica del grimorio alchemico dell'operatore.
 Rispondi sempre in italiano, con un tono solenne, misterioso, ermetico ma estremamente pratico ed operativo.
 Consiglia corrispondenze planetarie precise (colori di candele, incensi di suffumigio, ore e giorni ideali per agire, sigilli, pietre protettive) per sbloccare, bandire o attrarre forze.
 Evita risposte troppo generiche: parla come un antico maestro custode del tempio che guida l'operatore nella sua trasmutazione alchemica. Keep your response concise (maximum 3 paragraphs) but incredibly rich in ritual suggestions.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.8
-      }
+    // Format chat history for Groq (OpenAI-compatible) API
+    const messages = [
+      { role: "system", content: systemInstruction }
+    ];
+
+    if (history && Array.isArray(history)) {
+      history.forEach((msg: any) => {
+        messages.push({
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.text
+        });
+      });
+    }
+
+    // Add current user message
+    messages.push({
+      role: "user",
+      content: message
     });
 
-    const reply = response.text || "L'Egregora rimane in silenzio ermetico. Ricentra la tua volontà.";
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${groqApiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: messages,
+        temperature: 0.85,
+        max_tokens: 1024
+      })
+    });
+
+    if (!response.ok) {
+      const errorDetail = await response.text();
+      return res.json({
+        response: `Errore di Connessione Groq (${response.status}): ${errorDetail || "Nessun dettaglio aggiuntivo dal server Groq."}`,
+        isError: true
+      });
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || "L'Egregora rimane in silenzio ermetico. Ricentra la tua volontà.";
     return res.json({ response: reply, isFallback: false });
 
   } catch (error: any) {
-    console.error("Gemini chat error, falling back:", error);
-    const localReply = generateLocalChatResponse(req.body.message || "");
-    return res.json({ response: localReply, isFallback: true, errorMsg: error.message });
+    console.error("Groq chat error:", error);
+    return res.json({ 
+      response: `Errore di Rete / Connessione Chat: ${error.message || "Errore sconosciuto nella comunicazione con l'Egregora."}`, 
+      isError: true 
+    });
   }
 });
 
