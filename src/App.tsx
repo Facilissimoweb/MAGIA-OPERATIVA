@@ -2225,46 +2225,46 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                   handleSendChatMessage();
                 }
               }}
-              className="p-4 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2.5"
+              className="p-2.5 sm:p-4 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-1.5 sm:gap-2.5 shrink-0 w-full"
             >
               {/* PDF Download Button */}
               <button
                 type="button"
                 onClick={downloadChatPDF}
                 disabled={chatHistory.length <= 1}
-                className="p-3 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-xl disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d]"
+                className="p-2.5 sm:p-3 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-xl disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d] shrink-0"
                 title="Scarica Chat in PDF"
               >
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
               {/* Speech Input Button */}
               <button
                 type="button"
                 onClick={startListening}
-                className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer shrink-0 ${
                   isListening 
                     ? "bg-red-500/15 text-red-400 border-red-500 animate-pulse" 
                     : "bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 border-[#2b244d]"
                 }`}
                 title={isListening ? "Ascolto attivo... Clicca per fermare" : "Invia messaggio vocale"}
               >
-                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                {isListening ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
 
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Rivolgi la tua domanda ermetica all'Egregora..."
-                className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
+                placeholder="Rivolgi la tua domanda..."
+                className="flex-1 min-w-0 bg-[#120f24] border border-[#2b244d] rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
               />
               <button
                 type="submit"
                 disabled={!chatInput.trim() || isChatting}
-                className="bg-[#dfb15b] text-[#080612] p-3 rounded-xl hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
+                className="bg-[#dfb15b] text-[#080612] p-2.5 sm:p-3 rounded-xl hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0 flex items-center justify-center min-w-[40px]"
               >
-                <Send className="w-5 h-5" />
+                <Send className="w-4 h-4 sm:w-5 sm:h-5 text-[#080612]" />
               </button>
             </form>
           </div>
@@ -2862,27 +2862,27 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
       {/* CLASSIC FLOATING CHAT WIDGET */}
       <div className={`fixed z-50 flex flex-col items-end pointer-events-none transition-all duration-300 ${
         isChatOpen 
-          ? "inset-0 sm:inset-auto sm:bottom-6 sm:right-6 w-full h-full sm:w-auto" 
+          ? "inset-0 sm:inset-auto sm:bottom-6 sm:right-6 w-full h-[100dvh] sm:h-auto sm:w-auto" 
           : "bottom-6 right-6"
       }`} id="floating-chat-widget">
         {/* Chat window pane */}
         {isChatOpen && (
-          <div className="w-full sm:w-96 h-full sm:h-[520px] bg-[#0f0c23] sm:bg-[#0f0c23]/95 border-0 sm:border border-[#dfb15b]/45 rounded-none sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden backdrop-blur-md mb-0 sm:mb-4 pointer-events-auto animate-fadeIn animate-duration-300" id="egregora-chat-pane">
+          <div className="w-full sm:w-96 h-full sm:h-[520px] max-h-[100dvh] sm:max-h-[520px] bg-[#0f0c23] sm:bg-[#0f0c23]/95 border-0 sm:border border-[#dfb15b]/45 rounded-none sm:rounded-2xl flex flex-col shadow-2xl overflow-hidden backdrop-blur-md mb-0 sm:mb-4 pointer-events-auto animate-fadeIn animate-duration-300" id="egregora-chat-pane">
             {/* Header */}
-            <div className="p-4 sm:p-3.5 bg-[#080612]/90 border-b border-[#2b244d] flex items-center justify-between shrink-0">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 sm:w-8 sm:h-8 rounded-full bg-purple-900/30 border border-[#7c3aed] flex items-center justify-center text-purple-300 shrink-0">
+            <div className="p-3.5 sm:p-3 bg-[#080612]/90 border-b border-[#2b244d] flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-full bg-purple-900/30 border border-[#7c3aed] flex items-center justify-center text-purple-300 shrink-0">
                   <Sparkles className="w-4 h-4 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-serif text-sm sm:text-xs font-bold text-[#dfb15b] tracking-wider">L'Egregora dell'Arte</h3>
-                  <p className="text-[10px] sm:text-[9px] text-gray-400 font-mono">llama-3.3-70b-versatile • Online</p>
+                  <h3 className="font-serif text-xs font-bold text-[#dfb15b] tracking-wider">L'Egregora dell'Arte</h3>
+                  <p className="text-[9px] text-gray-400 font-mono">llama-3.3-70b-versatile • Online</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={clearChat}
-                  className="text-xs sm:text-[10px] text-gray-400 hover:text-white underline font-serif cursor-pointer p-1.5 sm:p-1 rounded hover:bg-white/5 transition-all"
+                  className="text-[11px] sm:text-[10px] text-gray-400 hover:text-white underline font-serif cursor-pointer p-1 rounded hover:bg-white/5 transition-all"
                   title="Azzera Memoria"
                   id="btn-clear-chat"
                 >
@@ -2894,27 +2894,27 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                   id="btn-close-chat"
                 >
                   <X className="w-4 h-4 text-[#dfb15b]" />
-                  <span className="font-serif hidden xs:inline">Chiudi</span>
+                  <span className="font-serif">Chiudi</span>
                 </button>
               </div>
             </div>
 
             {/* Chat List */}
-            <div className="flex-1 p-4 sm:p-3.5 overflow-y-auto space-y-4 text-sm sm:text-xs bg-[#0b081a]/40" id="chat-messages-container">
+            <div className="flex-1 p-3.5 sm:p-3 overflow-y-auto space-y-3.5 text-xs bg-[#0b081a]/40" id="chat-messages-container">
               {chatHistory.map((msg) => (
                 <div key={msg.id} className={`flex items-start ${msg.role === "user" ? "justify-end space-x-2" : "space-x-2"}`}>
                   {msg.role !== "user" && (
-                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-[#120f24] border border-[#dfb15b]/40 flex items-center justify-center text-[#dfb15b] shrink-0 mt-0.5 shadow-sm">
-                      <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <div className="w-7 h-7 rounded-full bg-[#120f24] border border-[#dfb15b]/40 flex items-center justify-center text-[#dfb15b] shrink-0 mt-0.5 shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5" />
                     </div>
                   )}
 
-                  <div className={`p-3.5 sm:p-3 rounded-xl max-w-[88%] sm:max-w-[85%] leading-relaxed ${
+                  <div className={`p-3 rounded-xl max-w-[85%] leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-[#dfb15b]/10 border border-[#dfb15b]/45 text-gray-150 rounded-tr-none font-serif text-[15px] sm:text-xs"
+                      ? "bg-[#dfb15b]/10 border border-[#dfb15b]/45 text-gray-150 rounded-tr-none font-serif text-xs"
                       : msg.isError 
-                        ? "bg-red-950/40 border border-red-500/40 text-red-200 rounded-tl-none font-mono text-xs sm:text-[11px]"
-                        : "bg-[#080612] border border-[#2b244d]/80 text-gray-300 rounded-tl-none font-serif text-[15px] sm:text-xs"
+                        ? "bg-red-950/40 border border-red-500/40 text-red-200 rounded-tl-none font-mono text-[11px]"
+                        : "bg-[#080612] border border-[#2b244d]/80 text-gray-300 rounded-tl-none font-serif text-xs"
                   }`}>
                     {msg.text}
                     
@@ -2929,14 +2929,14 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                           title={speakingMessageId === msg.id ? "Ferma Lettura" : "Ascolta Risposta"}
                           id={`btn-tts-${msg.id}`}
                         >
-                          {speakingMessageId === msg.id ? <VolumeX className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> : <Volume2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
+                          {speakingMessageId === msg.id ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                         </button>
                       </div>
                     )}
                   </div>
 
                   {msg.role === "user" && (
-                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-[#dfb15b] text-[#080612] flex items-center justify-center font-bold text-[10px] sm:text-[9px] font-serif shrink-0 mt-0.5 shadow-sm">
+                    <div className="w-7 h-7 rounded-full bg-[#dfb15b] text-[#080612] flex items-center justify-center font-bold text-[9px] font-serif shrink-0 mt-0.5 shadow-sm">
                       OP
                     </div>
                   )}
@@ -2945,10 +2945,10 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
 
               {isChatting && (
                 <div className="flex items-start space-x-2">
-                  <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-[#120f24] border border-[#7c3aed]/50 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 animate-spin">
-                    <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  <div className="w-7 h-7 rounded-full bg-[#120f24] border border-[#7c3aed]/50 flex items-center justify-center text-purple-400 shrink-0 mt-0.5 animate-spin">
+                    <Sparkles className="w-3.5 h-3.5" />
                   </div>
-                  <div className="bg-[#080612]/80 border border-[#2b244d]/80 p-3 rounded-xl rounded-tl-none text-gray-400 italic font-mono text-xs sm:text-[10px]">
+                  <div className="bg-[#080612]/80 border border-[#2b244d]/80 p-2.5 rounded-xl rounded-tl-none text-gray-400 italic font-mono text-[10px]">
                     L'Egregora sta consultando i transiti astrali...
                   </div>
                 </div>
@@ -2965,25 +2965,25 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                   handleSendChatMessage();
                 }
               }}
-              className="p-4 sm:p-3 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-2 pb-6 sm:pb-3 shrink-0 w-full"
+              className="p-2.5 sm:p-3 bg-[#080612]/95 border-t border-[#2b244d] flex items-center gap-1.5 sm:gap-2 pb-3 shrink-0 w-full"
             >
               {/* PDF Download Button */}
               <button
                 type="button"
                 onClick={downloadChatPDF}
                 disabled={chatHistory.length <= 1}
-                className="p-3 sm:p-2.5 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d] shrink-0"
+                className="p-2.5 sm:p-2 bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-[#2b244d] shrink-0"
                 title="Scarica Chat PDF"
                 id="btn-download-chat-pdf"
               >
-                <Download className="w-5 h-5 sm:w-4 sm:h-4" />
+                <Download className="w-4 h-4" />
               </button>
 
               {/* Speech Input Button */}
               <button
                 type="button"
                 onClick={startListening}
-                className={`p-3 sm:p-2.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                className={`p-2.5 sm:p-2 rounded-lg border transition-all cursor-pointer shrink-0 ${
                   isListening 
                     ? "bg-red-500/10 text-red-400 border-red-500 animate-pulse" 
                     : "bg-[#120f24] text-gray-400 hover:text-[#dfb15b] hover:bg-[#dfb15b]/10 border-[#2b244d]"
@@ -2991,7 +2991,7 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                 title={isListening ? "Ascolto attivo... Premi per fermare" : "Invia messaggio vocale"}
                 id="btn-voice-input"
               >
-                {isListening ? <MicOff className="w-5 h-5 sm:w-4 sm:h-4" /> : <Mic className="w-5 h-5 sm:w-4 sm:h-4" />}
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
 
               <input
@@ -2999,16 +2999,16 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Chiedi all'Egregora..."
-                className="flex-1 bg-[#120f24] border border-[#2b244d] rounded-lg px-3.5 py-2.5 sm:px-3 sm:py-2 text-[15px] sm:text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
+                className="flex-1 min-w-0 bg-[#120f24] border border-[#2b244d] rounded-lg px-3 py-2 text-sm sm:text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] transition-all font-serif"
                 id="chat-text-input"
               />
               <button
                 type="submit"
                 disabled={!chatInput.trim() || isChatting}
-                className="bg-[#dfb15b] text-[#080612] p-3 sm:p-2.5 rounded-lg hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0"
+                className="bg-[#dfb15b] text-[#080612] p-2.5 sm:p-2.5 rounded-lg hover:brightness-110 disabled:brightness-50 transition-all cursor-pointer shadow-md shrink-0 flex items-center justify-center min-w-[38px] min-h-[38px]"
                 id="btn-send-chat"
               >
-                <Send className="w-5 h-5 sm:w-4 sm:h-4" />
+                <Send className="w-4 h-4 text-[#080612]" />
               </button>
             </form>
           </div>
@@ -3017,7 +3017,9 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
         {/* Floating Toggle Button */}
         <button
           onClick={() => { setIsChatOpen(!isChatOpen); playKeyClick(400); }}
-          className="pointer-events-auto w-14 h-14 rounded-full bg-gradient-to-tr from-[#dfb15b] to-[#7c3aed] text-white flex items-center justify-center shadow-[0_4px_20px_rgba(223,177,91,0.4)] hover:scale-105 transition-all active:scale-95 cursor-pointer relative"
+          className={`pointer-events-auto w-14 h-14 rounded-full bg-gradient-to-tr from-[#dfb15b] to-[#7c3aed] text-white items-center justify-center shadow-[0_4px_20px_rgba(223,177,91,0.4)] hover:scale-105 transition-all active:scale-95 cursor-pointer relative ${
+            isChatOpen ? "hidden sm:flex" : "flex"
+          }`}
           id="btn-chat-toggle"
         >
           {isChatOpen ? <X className="w-6 h-6 text-white" /> : <MessageCircle className="w-6 h-6 text-white" />}
