@@ -199,40 +199,6 @@ Esempi di Deflessione dei Guardrail (Few-Shot Pattern):
       }
     }
 
-    // Attempt Gemini Fallback
-    const ai = getGeminiClient();
-    if (ai) {
-      try {
-        const contents = [];
-        if (history && Array.isArray(history)) {
-          history.forEach((msg: any) => {
-            contents.push({
-              role: msg.role === "user" ? "user" : "model",
-              parts: [{ text: msg.text }]
-            });
-          });
-        }
-        contents.push({
-          role: "user",
-          parts: [{ text: message }]
-        });
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: contents,
-          config: {
-            systemInstruction: systemInstruction,
-          }
-        });
-
-        if (response.text) {
-          return res.json({ response: response.text, isFallback: false, source: "gemini" });
-        }
-      } catch (geminiErr) {
-        console.error("Gemini API fallback call failed, will use local fallback:", geminiErr);
-      }
-    }
-
     // High fidelity algorithmic local fallback
     console.log("Using local alchemical chat response generator fallback.");
     const fallbackReply = generateLocalChatResponse(message);
