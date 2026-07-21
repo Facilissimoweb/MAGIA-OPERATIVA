@@ -41,22 +41,33 @@ import {
   Mic,
   MicOff,
   Volume2,
-  VolumeX
+  VolumeX,
+  Layers
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { getMoonPhaseData, MoonPhaseData } from "./utils/lunar";
 import { GLOSSARY_DATABASE } from "./data/glossary";
+import { ARCANI_MAGGIORI } from "./data/tarocchi";
 import { Diagnosis, Ritual, Investigation, TimelineStep, MediaItem, ChatMessage } from "./types";
 
 export default function App() {
   // Navigation & Engine Settings
-  const [activeTab, setActiveTab] = useState<"diagnosi" | "dossier" | "luna" | "trance" | "egregora" | "glossario" | "grimorio">("diagnosi");
+  const [activeTab, setActiveTab] = useState<"diagnosi" | "dossier" | "luna" | "trance" | "egregora" | "glossario" | "grimorio" | "tarocchi">("diagnosi");
   const [engine, setEngine] = useState<"gemini" | "local">("gemini");
   const [isMoonBadgeFlash, setIsMoonBadgeFlash] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [operatorSignature, setOperatorSignature] = useState(() => {
     return localStorage.getItem("mo_operator_signature") || "Maria Teresa Rogani - Tarot Italia";
   });
+
+  // Tarot State
+  const [selectedTarotCardId, setSelectedTarotCardId] = useState<string | null>(null);
+  const [tarotDrawType, setTarotDrawType] = useState<"single" | "three">("single");
+  const [tarotQuestion, setTarotQuestion] = useState("");
+  const [drawnCards, setDrawnCards] = useState<{ card: any; isReversed: boolean }[]>([]);
+  const [tarotReading, setTarotReading] = useState<string | null>(null);
+  const [isGeneratingReading, setIsGeneratingReading] = useState(false);
+  const [tarotSubTab, setTarotSubTab] = useState<"compendio" | "stesa">("compendio");
 
   // Diagnosis State
   const [problemText, setProblemText] = useState("");
@@ -1094,6 +1105,64 @@ export default function App() {
     }
   };
 
+  // TAROT DRAW LOGIC
+  const handleDrawTarot = async () => {
+    if (isGeneratingReading) return;
+    setIsGeneratingReading(true);
+    setTarotReading(null);
+    playKeyClick(600);
+
+    const count = tarotDrawType === "single" ? 1 : 3;
+    const shuffled = [...ARCANI_MAGGIORI].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, count).map((card) => ({
+      card,
+      isReversed: Math.random() < 0.5
+    }));
+
+    setDrawnCards(selected);
+
+    const prompt = `Esegui una lettura rituale ed esoterica dei Tarocchi per la mia domanda: "${tarotQuestion || "Quale influsso energetico guida il mio cammino?"}".
+Ho estratto le seguenti carte degli Arcani Maggiori del mazzo Rider-Waite-Smith:
+${selected.map((dc, index) => `${index + 1}. Card: ${dc.card.name} (${dc.isReversed ? "Capovolta" : "Diritta"}) - Parole chiave: ${dc.card.keywords.join(", ")}\nSignificato generale: ${dc.isReversed ? dc.card.capovolta : dc.card.diritta}\nElemento ed Astrologia: ${dc.card.element} • ${dc.card.astrology}`).join("\n\n")}
+
+Fornisci una risposta formattata splendidamente in Italiano con un tono estremamente solenne, ermetico, saggio e costruttivo (come l'Egregora dell'Alta Magia Operativa). Strutturala esattamente in questi quattro paragrafi ben definiti:
+- 🌌 INTERPRETAZIONE ENERGETICA (Sintesi ermetica della stesa rispetto all'intento)
+- 🎴 ANALISI DELLE CARTE E SIMBOLISMO (Esamina con cura ogni carta estratta, il suo simbolismo esoterico e il suo orientamento)
+- 🧪 CONSIGLIO ALCHEMICO OPERATIVO (Un'azione pratica, visualizzazione, meditazione o rito consigliato in base agli elementi emersi per trasmutare l'energia)
+- 🧭 DOMANDA MAIEUTICA (Una domanda profonda e penetrante per spronare l'Operatore all'azione consapevole)`;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: prompt,
+          history: []
+        })
+      });
+
+      if (!res.ok) throw new Error("Server responded with error status");
+      const data = await res.json();
+      setTarotReading(data.response);
+      playMysticChime();
+    } catch (e: any) {
+      console.error("Tarot reading fetch error:", e);
+      let fallbackText = `🌌 **INTERPRETAZIONE ENERGETICA**\nLa tua domanda "${tarotQuestion || "Quale influsso energetico guida il mio cammino?"}" risuona profondamente nei piani astrali. L'estrazione rileva una forte concentrazione di energie di tipo ${selected.map(s => s.card.element).join(" / ")}. Nonostante la disconnessione della rete dall'Egregora, la saggezza dei simboli incisi si manifesta ugualmente nel tempio.\n\n🎴 **ANALISI DELLE CARTE E SIMBOLISMO**\n`;
+      
+      selected.forEach((dc, idx) => {
+        const orientation = dc.isReversed ? "Capovolta" : "Diritta";
+        fallbackText += `\n*Carta ${idx + 1}: ${dc.card.name} (${orientation})* — parole chiave: ${dc.card.keywords.join(", ")}.\nSignificato: ${dc.isReversed ? dc.card.capovolta : dc.card.diritta}\nSimbolismo chiave: ${dc.card.symbolism.map(s => `**${s.item}** (${s.meaning})`).join(", ")}.\n`;
+      });
+
+      fallbackText += `\n🧪 **CONSIGLIO ALCHEMICO OPERATIVO**\nMedita sulle carte estratte e sui loro colori dominanti (principalmente ${selected.map(s => s.card.color).join(" / ")}). Utilizza l'Elemento ${selected[0].card.element} per canalizzare o bandire le resistenze riscontrate. Accogli l'energia nella tua sfera personale seguendo questa guida: ${selected[0].card.accogliere.personale}\n\n🧭 **DOMANDA MAIEUTICA**\nSei pronto ad accogliere la verità celata nei tuoi simboli interiori per agire come unico sovrano del tuo destino?`;
+
+      setTarotReading(fallbackText);
+      playMysticChime();
+    } finally {
+      setIsGeneratingReading(false);
+    }
+  };
+
   // 13. Dynamic Interactive Sigil Press and Hold charging
   const startCharging = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -1226,6 +1295,7 @@ export default function App() {
                   { id: "dossier", label: "Dossier d'Indagine", icon: FolderSearch, desc: "Gestione Fascicoli & Reperti" },
                   { id: "luna", label: "Calendario Lunare", icon: Moon, desc: "Fasi Lunari & Transiti" },
                   { id: "trance", label: "Stazione Trance", icon: Zap, desc: "Respirazione & Carica Sigillo" },
+                  { id: "tarocchi", label: "Lettura dei Tarocchi", icon: Layers, desc: "Guida Arcani Maggiori & Stese" },
                   { id: "egregora", label: "Egregora Chat", icon: MessageSquare, desc: "Sintesi Animica dell'Opera" },
                   { id: "glossario", label: "Glossario Alchemico", icon: Book, desc: "Terminologia ed Elementi" },
                   { id: "grimorio", label: "Grimorio Formule", icon: Bookmark, desc: "Custodia Rituali Sacri" }
@@ -2166,6 +2236,332 @@ export default function App() {
                 <Send className="w-5 h-5" />
               </button>
             </div>
+          </div>
+        )}
+
+        {/* VIEW: LETTURA DEI TAROCCHI */}
+        {activeTab === "tarocchi" && (
+          <div className="space-y-6 animate-fadeIn" id="tarocchi-view">
+            {/* Header description block */}
+            <div className="bg-[#120f24] border border-[#dfb15b]/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#dfb15b]/5 rounded-full blur-2xl pointer-events-none" />
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] text-[#dfb15b] uppercase tracking-widest font-bold block mb-1 font-mono">
+                    Il Viaggio del Matto • Arcani Maggiori
+                  </span>
+                  <h2 className="font-serif text-xl font-bold text-white tracking-wide">
+                    La Guida Iniziatica ai Tarocchi
+                  </h2>
+                  <p className="text-xs text-gray-300 mt-1 max-w-xl leading-relaxed">
+                    Sulla base del compendio di Lisa Butterworth, gli Arcani Maggiori sono ventidue epici archetipi e grandi lezioni di vita che illuminano la nostra esistenza materiale, emotiva e spirituale.
+                  </p>
+                </div>
+                {/* Mode selector buttons */}
+                <div className="flex bg-[#080612] p-1 rounded-xl border border-[#2b244d] self-start md:self-center shrink-0">
+                  <button
+                    onClick={() => { setTarotSubTab("compendio"); playKeyClick(300); }}
+                    className={`px-3.5 py-1.5 text-xs font-serif font-bold rounded-lg transition-all cursor-pointer ${
+                      tarotSubTab === "compendio"
+                        ? "bg-[#dfb15b] text-[#080612] shadow-md"
+                        : "text-gray-400 hover:text-gray-200"
+                    }`}
+                  >
+                    Compendio Arcani
+                  </button>
+                  <button
+                    onClick={() => { setTarotSubTab("stesa"); playKeyClick(300); }}
+                    className={`px-3.5 py-1.5 text-xs font-serif font-bold rounded-lg transition-all cursor-pointer ${
+                      tarotSubTab === "stesa"
+                        ? "bg-[#dfb15b] text-[#080612] shadow-md"
+                        : "text-gray-400 hover:text-gray-200"
+                    }`}
+                  >
+                    Stesa Rituale
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* TAB 1: COMPENDIO ARCANI MAGGIORI */}
+            {tarotSubTab === "compendio" && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Cards Grid List */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="bg-[#120f24]/50 border border-[#2b244d]/50 p-4 rounded-xl flex items-center justify-between">
+                    <span className="text-xs text-gray-300 font-serif">Seleziona un Arcano per rivelarne i misteri celati:</span>
+                    <span className="text-[10px] text-[#dfb15b] font-mono uppercase tracking-wider">{ARCANI_MAGGIORI.length} Archetipi Attivi</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {ARCANI_MAGGIORI.map((card) => {
+                      const isSelected = selectedTarotCardId === card.id;
+                      return (
+                        <button
+                          key={card.id}
+                          onClick={() => { setSelectedTarotCardId(card.id); playKeyClick(400); }}
+                          className={`flex flex-col items-center justify-between p-4 rounded-xl border transition-all cursor-pointer group text-center h-44 ${
+                            isSelected
+                              ? "bg-[#1d1736] border-[#dfb15b] shadow-lg shadow-[#dfb15b]/5"
+                              : "bg-[#120f24] border-[#2b244d] hover:border-[#dfb15b]/40 hover:bg-[#120f24]/80"
+                          }`}
+                        >
+                          <div className="w-full flex justify-between items-center text-[10px] font-mono">
+                            <span className="text-[#dfb15b] font-bold">{card.roman}</span>
+                            <span className="text-gray-500 font-semibold uppercase">{card.element}</span>
+                          </div>
+
+                          <div className="flex flex-col items-center justify-center py-2">
+                            <div className={`w-12 h-16 border rounded-lg flex items-center justify-center mb-1.5 transition-transform duration-300 group-hover:scale-105 ${
+                              isSelected ? "border-[#dfb15b] bg-[#dfb15b]/5" : "border-gray-700 bg-[#080612]"
+                            }`}>
+                              <span className="font-serif text-lg font-bold text-[#dfb15b]">{card.roman}</span>
+                            </div>
+                            <span className="font-serif text-xs font-bold text-gray-200 block group-hover:text-[#dfb15b] transition-colors">
+                              {card.name}
+                            </span>
+                          </div>
+
+                          <div className="text-[8px] text-gray-500 font-mono tracking-wider truncate w-full">
+                            {card.astrology}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Detail panel */}
+                <div className="lg:col-span-1">
+                  {(() => {
+                    const selectedCard = ARCANI_MAGGIORI.find(c => c.id === selectedTarotCardId) || ARCANI_MAGGIORI[9]; // Defaults to L'Eremita if nothing selected yet
+                    return (
+                      <div className="bg-[#120f24] border border-[#dfb15b]/30 rounded-2xl p-5 shadow-xl space-y-5 sticky top-24">
+                        <div className="bg-[#080612] border border-[#2b244d] rounded-xl p-4 text-center space-y-2 relative overflow-hidden">
+                          <div className="absolute top-2 left-2 text-xs font-mono text-[#dfb15b] font-bold">
+                            {selectedCard.roman}
+                          </div>
+                          <div className="absolute top-2 right-2 text-[9px] font-mono text-gray-400 uppercase">
+                            {selectedCard.element} • {selectedCard.astrology}
+                          </div>
+
+                          <div className="w-20 h-28 border-2 border-[#dfb15b] rounded-xl flex items-center justify-center mx-auto bg-[#120f24]/80 shadow-inner my-2">
+                            <div className="text-center">
+                              <span className="font-serif text-2xl font-bold text-[#dfb15b] block">{selectedCard.roman}</span>
+                              <span className="text-[8px] text-gray-400 tracking-widest uppercase block mt-1">Tarot</span>
+                            </div>
+                          </div>
+
+                          <h3 className="font-serif text-base font-bold text-[#dfb15b] tracking-wider mt-2">
+                            {selectedCard.name}
+                          </h3>
+
+                          <div className="flex flex-wrap justify-center gap-1.5 pt-1">
+                            {selectedCard.keywords.map((kw, i) => (
+                              <span key={i} className="text-[9px] bg-purple-950/45 text-purple-300 border border-purple-800/40 px-2 py-0.5 rounded-full font-serif font-semibold">
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <h4 className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">La Carta e l'Iconografia</h4>
+                          <p className="text-xs text-gray-300 leading-relaxed font-serif">
+                            {selectedCard.description}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2 pt-1 border-t border-[#2b244d]">
+                          <h4 className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Simbolismo ed Ermetismo</h4>
+                          <div className="space-y-2">
+                            {selectedCard.symbolism.map((sym, i) => (
+                              <div key={i} className="text-xs font-serif bg-[#080612]/50 p-2 rounded-lg border border-[#2b244d]/60">
+                                <span className="text-[#dfb15b] font-bold block">{sym.item}</span>
+                                <span className="text-gray-400 text-[11px] block mt-0.5 leading-relaxed">{sym.meaning}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2.5 pt-2 border-t border-[#2b244d] text-xs">
+                          <div className="space-y-1 bg-[#0f172a]/20 p-3 rounded-lg border border-emerald-950/40">
+                            <span className="text-[10px] font-mono font-bold text-emerald-400 tracking-widest uppercase block">▲ DIRITTA (La Via Maestra)</span>
+                            <p className="text-gray-200 leading-relaxed font-serif">{selectedCard.diritta}</p>
+                          </div>
+                          <div className="space-y-1 bg-[#270000]/10 p-3 rounded-lg border border-red-950/30">
+                            <span className="text-[10px] font-mono font-bold text-red-400 tracking-widest uppercase block">▼ CAPOVOLTA (La Deviazione / Blocco)</span>
+                            <p className="text-gray-300 leading-relaxed font-serif">{selectedCard.capovolta}</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 pt-2 border-t border-[#2b244d]">
+                          <h4 className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Accogliere l'Energia dell'Arcano</h4>
+                          <div className="grid grid-cols-1 gap-2 text-[11px] font-serif">
+                            <div className="bg-[#080612]/40 p-2.5 rounded-lg">
+                              <span className="text-purple-300 font-bold block mb-0.5">Sfera Personale:</span>
+                              <span className="text-gray-400 leading-relaxed block">{selectedCard.accogliere.personale}</span>
+                            </div>
+                            <div className="bg-[#080612]/40 p-2.5 rounded-lg">
+                              <span className="text-[#dfb15b] font-bold block mb-0.5">Relazioni:</span>
+                              <span className="text-gray-400 leading-relaxed block">{selectedCard.accogliere.relazioni}</span>
+                            </div>
+                            <div className="bg-[#080612]/40 p-2.5 rounded-lg">
+                              <span className="text-emerald-300 font-bold block mb-0.5">Lavoro / Obiettivi:</span>
+                              <span className="text-gray-400 leading-relaxed block">{selectedCard.accogliere.lavoro}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: STESA RITUALE DELLE CARTE */}
+            {tarotSubTab === "stesa" && (
+              <div className="space-y-6">
+                <div className="bg-[#120f24] border border-[#2b244d] rounded-2xl p-5 shadow-lg space-y-4">
+                  <div>
+                    <span className="text-[9px] text-[#dfb15b] uppercase tracking-widest font-bold block mb-0.5">Centra il tuo Intento</span>
+                    <h3 className="font-serif text-sm font-bold text-white">Consulto Rituale con l'Egregora</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-gray-400 font-mono uppercase tracking-wider block">Modalità di Lettura</label>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => { setTarotDrawType("single"); playKeyClick(300); }}
+                          className={`flex-1 p-3 rounded-xl border text-center font-serif text-xs font-bold transition-all cursor-pointer ${
+                            tarotDrawType === "single"
+                              ? "bg-[#dfb15b]/15 border-[#dfb15b] text-[#dfb15b]"
+                              : "bg-[#080612]/80 border-[#2b244d] text-gray-400 hover:border-gray-700"
+                          }`}
+                        >
+                          Estrai 1 Carta (Mantra / Sblocco)
+                        </button>
+                        <button
+                          onClick={() => { setTarotDrawType("three"); playKeyClick(300); }}
+                          className={`flex-1 p-3 rounded-xl border text-center font-serif text-xs font-bold transition-all cursor-pointer ${
+                            tarotDrawType === "three"
+                              ? "bg-[#dfb15b]/15 border-[#dfb15b] text-[#dfb15b]"
+                              : "bg-[#080612]/80 border-[#2b244d] text-gray-400 hover:border-gray-700"
+                          }`}
+                        >
+                          Estrai 3 Carte (Passato, Presente, Futuro)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-gray-400 font-mono uppercase tracking-wider block">La tua Domanda Ermetica (Opzionale)</label>
+                      <input
+                        type="text"
+                        value={tarotQuestion}
+                        onChange={(e) => setTarotQuestion(e.target.value)}
+                        placeholder="Es: Quale forza sbloccherà la mia situazione lavorativa stagnante?"
+                        className="w-full bg-[#080612] border border-[#2b244d] rounded-xl px-3 py-3 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#dfb15b] font-serif"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={handleDrawTarot}
+                      disabled={isGeneratingReading}
+                      className="px-6 py-3.5 bg-gradient-to-r from-[#dfb15b] to-amber-600 text-[#080612] font-serif font-bold text-xs rounded-xl shadow-md hover:brightness-110 active:scale-95 disabled:brightness-50 transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4 animate-spin-slow" />
+                      <span>{isGeneratingReading ? "Consultazione Astrale..." : "Mescola e Estrai Carte"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {drawnCards.length > 0 && (
+                  <div className="space-y-6 animate-fadeIn">
+                    <div className="bg-[#080612]/90 border border-[#2b244d] rounded-2xl p-6 shadow-inner space-y-4">
+                      <h4 className="text-center font-serif text-xs font-bold text-[#dfb15b] tracking-widest uppercase">
+                        {tarotDrawType === "single" ? "La Carta del Destino Estratta" : "La Trinità Temporale Estratta"}
+                      </h4>
+
+                      <div className="flex flex-wrap justify-center gap-6 py-4">
+                        {drawnCards.map((dc, index) => (
+                          <div key={index} className="flex flex-col items-center space-y-2">
+                            {tarotDrawType === "three" && (
+                              <span className="text-[9px] font-mono text-purple-400 uppercase tracking-widest font-semibold block mb-1 bg-purple-950/30 px-2 py-0.5 rounded border border-purple-900/30">
+                                {index === 0 ? "1. PASSATO" : index === 1 ? "2. PRESENTE" : "3. FUTURO"}
+                              </span>
+                            )}
+
+                            <div className="relative group w-36 h-56 bg-[#120f24] border-2 border-[#dfb15b]/80 rounded-2xl shadow-[0_10px_25px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col justify-between p-4 transition-all duration-500 hover:scale-105 hover:shadow-[#dfb15b]/10">
+                              <div className="absolute inset-0 bg-gradient-to-b from-[#dfb15b]/5 via-transparent to-[#080612] pointer-events-none" />
+                              
+                              <div className="relative z-10 flex justify-between items-center text-[9px] font-mono">
+                                <span className="text-[#dfb15b] font-bold">{dc.card.roman}</span>
+                                <span className="text-gray-500 font-semibold">{dc.card.element}</span>
+                              </div>
+
+                              <div className="relative z-10 flex flex-col items-center justify-center my-auto py-2">
+                                {dc.isReversed && (
+                                  <span className="text-[8px] bg-red-950/50 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded font-mono uppercase tracking-wider mb-2">
+                                    Capovolta
+                                  </span>
+                                )}
+                                
+                                <div className={`w-10 h-14 border rounded-lg flex items-center justify-center bg-[#080612]/90 shadow-inner ${
+                                  dc.isReversed ? "rotate-180 border-red-800/40 text-red-400" : "border-[#dfb15b]/55 text-[#dfb15b]"
+                                }`}>
+                                  <span className="font-serif text-base font-bold">{dc.card.roman}</span>
+                                </div>
+                              </div>
+
+                              <div className="relative z-10 text-center space-y-1">
+                                <span className="font-serif text-xs font-bold text-gray-200 block leading-tight truncate">
+                                  {dc.card.name}
+                                </span>
+                                <span className="text-[8px] text-gray-500 block truncate font-mono tracking-wider">
+                                  {dc.card.astrology}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {tarotReading && (
+                      <div className="bg-[#120f24] border border-[#dfb15b]/30 rounded-2xl p-6 shadow-xl space-y-4 animate-fadeIn" id="tarot-reading-container">
+                        <div className="flex items-center justify-between border-b border-[#2b244d] pb-3">
+                          <div className="flex items-center space-x-2">
+                            <Sparkles className="w-5 h-5 text-[#dfb15b] animate-pulse" />
+                            <h4 className="font-serif text-sm font-bold text-[#dfb15b] tracking-wider uppercase">Il Responso dell'Egregora</h4>
+                          </div>
+                          
+                          <button
+                            onClick={() => speakMessage(tarotReading, "tarot-reading-tts")}
+                            className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center space-x-1.5 text-xs font-serif ${
+                              speakingMessageId === "tarot-reading-tts"
+                                ? "bg-[#dfb15b]/10 text-[#dfb15b] border-[#dfb15b] animate-pulse"
+                                : "bg-[#080612] text-gray-400 hover:text-white border-[#2b244d]"
+                            }`}
+                            title="Ascolta Responso"
+                          >
+                            {speakingMessageId === "tarot-reading-tts" ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            <span>{speakingMessageId === "tarot-reading-tts" ? "Ferma Voce" : "Ascolta Lettura"}</span>
+                          </button>
+                        </div>
+
+                        <div className="text-xs text-gray-200 leading-relaxed font-serif space-y-4 whitespace-pre-line bg-[#080612]/30 p-4 rounded-xl border border-[#2b244d]/50">
+                          {tarotReading}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
