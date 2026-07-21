@@ -1,0 +1,6 @@
+{
+  "name": "Magia Operativa",
+  "description": "Sistema Operativo Esoterico per indagini alchemiche, calcoli lunari, grimoire e sintonizzazione di intenti.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
