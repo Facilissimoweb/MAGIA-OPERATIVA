@@ -48,9 +48,12 @@ import {
   Link,
   Eye,
   Edit3,
-  Calendar
+  Calendar,
+  Copy,
+  Check
 } from "lucide-react";
 import { jsPDF } from "jspdf";
+import Markdown from "react-markdown";
 import { getMoonPhaseData, MoonPhaseData } from "./utils/lunar";
 import { GLOSSARY_DATABASE } from "./data/glossary";
 import { ARCANI_MAGGIORI } from "./data/tarocchi";
@@ -187,6 +190,7 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -1481,6 +1485,19 @@ Ogni forza mossa ha trovato la sua direzione di riequilibrio; la Volontà impres
 
     setSpeakingMessageId(msgId);
     window.speechSynthesis.speak(utterance);
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedMessageId(id);
+      playKeyClick(700);
+      setTimeout(() => {
+        setCopiedMessageId(null);
+      }, 2000);
+    } catch (err) {
+      console.error("Errore copia appunti:", err);
+    }
   };
 
   // PDF Export for chat (Scarica la chat in PDF)
@@ -4023,11 +4040,55 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                         ? "bg-red-950/40 border border-red-500/40 text-red-200 rounded-tl-none font-mono text-[11px]"
                         : "bg-[#080612] border border-[#2b244d]/80 text-gray-300 rounded-tl-none font-serif text-xs"
                   }`}>
-                    {msg.text}
+                    {msg.role === "user" || msg.isError ? (
+                      msg.text
+                    ) : (
+                      <div className="markdown-content">
+                        <Markdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed text-xs">{children}</p>,
+                            strong: ({ children }) => <strong className="font-bold text-[#dfb15b]">{children}</strong>,
+                            em: ({ children }) => <em className="italic text-purple-200">{children}</em>,
+                            ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2 pl-1 font-sans text-[11.5px] text-gray-200">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2 pl-1 font-sans text-[11.5px] text-gray-200">{children}</ol>,
+                            li: ({ children }) => <li className="leading-snug">{children}</li>,
+                            blockquote: ({ children }) => (
+                              <blockquote className="border-l-2 border-[#dfb15b]/80 bg-[#dfb15b]/10 pl-2.5 py-1.5 my-2 rounded-r italic text-amber-100 text-[11.5px] font-serif">
+                                {children}
+                              </blockquote>
+                            ),
+                            h1: ({ children }) => <h1 className="text-sm font-serif font-bold text-[#dfb15b] border-b border-[#2b244d] pb-1 mt-2 mb-1">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-xs font-serif font-bold text-purple-300 mt-2 mb-1">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-xs font-serif font-bold text-[#dfb15b] mt-1.5 mb-1">{children}</h3>,
+                            code: ({ children }) => <code className="bg-[#120f24] text-[#dfb15b] px-1.5 py-0.5 rounded border border-[#2b244d] font-mono text-[11px]">{children}</code>
+                          }}
+                        >
+                          {msg.text}
+                        </Markdown>
+                      </div>
+                    )}
                     
                     {/* Controls for model response */}
                     {msg.role === "model" && !msg.isError && (
                       <div className="mt-2 pt-1.5 border-t border-[#2b244d]/50 flex items-center justify-end gap-1.5 text-[10px]">
+                        <button
+                          onClick={() => copyToClipboard(msg.text, msg.id)}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#120f24] hover:bg-[#dfb15b]/15 text-[#dfb15b] border border-[#2b244d] hover:border-[#dfb15b]/50 transition-all cursor-pointer font-sans"
+                          title="Copia responso negli appunti"
+                          id={`btn-copy-${msg.id}`}
+                        >
+                          {copiedMessageId === msg.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-emerald-400 font-bold">Copiato!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copia</span>
+                            </>
+                          )}
+                        </button>
                         <button
                           onClick={() => downloadSingleMessagePDF(msg)}
                           className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#120f24] hover:bg-[#dfb15b]/15 text-[#dfb15b] border border-[#2b244d] hover:border-[#dfb15b]/50 transition-all cursor-pointer font-sans"
