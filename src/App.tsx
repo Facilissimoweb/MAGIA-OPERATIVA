@@ -42,13 +42,17 @@ import {
   MicOff,
   Volume2,
   VolumeX,
-  Layers
+  Layers,
+  ShieldCheck,
+  Users,
+  Link,
+  Eye
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { getMoonPhaseData, MoonPhaseData } from "./utils/lunar";
 import { GLOSSARY_DATABASE } from "./data/glossary";
 import { ARCANI_MAGGIORI } from "./data/tarocchi";
-import { Diagnosis, Ritual, Investigation, TimelineStep, MediaItem, ChatMessage } from "./types";
+import { Diagnosis, Ritual, Investigation, TimelineStep, MediaItem, ChatMessage, InvolvedPerson, FetishItem, ProtectiveBanishment } from "./types";
 
 export default function App() {
   // Navigation & Engine Settings

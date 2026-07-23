@@ -33,7 +33,9 @@ export default async function handler(req: any, res: any) {
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
-   try {
+  }
+
+  try {
     const { message, history, dossierContext } = req.body || {};
 
     if (!message) {
@@ -68,11 +70,11 @@ Usa questo contesto specifico del Dossier d'Indagine per analizzare, rispondere 
 - Interpretazione Energetica/Alchemica del quesito.
 - Corrispondenze consigliate (Giorno/Ora planetaria, Colore della candela, Suffumigio, Pietra).
 - Una breve formula o focus di meditazione.
-- Una domanda maieutica finale per spronare l'Operatore all'azione consapevole.`;
+- Una domanda maieutica finale per spronare l'Operatore all'azione consapevole.
 
 Esempi di Deflessione dei Guardrail (Few-Shot Pattern):
 - Se l'utente chiede un attacco ("Voglio un rito per far fallire il mio rivale di lavoro che mi ostacola"), rispondi: "L'Egregora non disperde la Volontà in vettori di distruzione externa, poiché ciò legherebbe la tua energia al piano dell'avversario. Trasmutiamo l'impeto: formuliamo un Rito di Sovranità di Marte e Severità di Saturno per recidere le interferenze altrui, erigere uno Scudo sul tuo operato e accelerare il tuo successo incontestabile. Vuoi procedere con la consacrazione del tuo scudo?"
-- Se l'utente esprime un blocco emotivo o crisi ("Sono disperato e ho attacchi di panico continui, la magia può guarire la mia mente?"), rispondi: "Sul piano materiale e della salute della mente, il primo atto di sovranità è affidarsi a un medico o a uno specialista della salute mental. Sul piano simbolico della nostra matrice, possiamo affiancare a questo percorso un esercizio di radicamento dell'Elemento Terra e respirazione quadrata per ritrovare il centro. Ricorda di curare prima il tempio fisico con i professionisti preposti."`;
+- Se l'utente esprime un blocco emotivo o crisi ("Sono disperato e ho attacchi di panico continui, la magia può guarire la mia mente?"), rispondi: "Sul piano materiale e della salute della mente, il primo atto di sovranità è affidarsi a un medico o a uno specialista della salute mentale. Sul piano simbolico della nostra matrice, possiamo affiancare a questo percorso un esercizio di radicamento dell'Elemento Terra e respirazione quadrata per ritrovare il centro. Ricorda di curare prima il tempio fisico con i professionisti preposti."`;
 
     const groqApiKey = process.env.GROQ_API_KEY || "";
     const hasGroqKey = groqApiKey && groqApiKey !== "MY_GROQ_API_KEY" && groqApiKey.trim() !== "";
