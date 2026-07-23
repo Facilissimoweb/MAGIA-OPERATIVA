@@ -46,13 +46,15 @@ import {
   ShieldCheck,
   Users,
   Link,
-  Eye
+  Eye,
+  Edit3,
+  Calendar
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { getMoonPhaseData, MoonPhaseData } from "./utils/lunar";
 import { GLOSSARY_DATABASE } from "./data/glossary";
 import { ARCANI_MAGGIORI } from "./data/tarocchi";
-import { Diagnosis, Ritual, Investigation, TimelineStep, MediaItem, ChatMessage, InvolvedPerson, FetishItem, ProtectiveBanishment } from "./types";
+import { Diagnosis, Ritual, Investigation, TimelineStep, MediaItem, ChatMessage, InvolvedPerson, FetishItem, ProtectiveBanishment, ConsecrationProtocol } from "./types";
 
 export default function App() {
   // Navigation & Engine Settings
@@ -149,11 +151,22 @@ export default function App() {
   const [newFetishDesc, setNewFetishDesc] = useState("");
   const [newFetishImgUrl, setNewFetishImgUrl] = useState("");
 
-  // Timeline Step Modal State
+  // Timeline Step Modal State (Con inserimento e calcolo data manuale)
   const [isStepModalOpen, setIsStepModalOpen] = useState(false);
   const [newStepTitle, setNewStepTitle] = useState("");
+  const [newStepDate, setNewStepDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [newStepTiming, setNewStepTiming] = useState("");
   const [newStepStatus, setNewStepStatus] = useState<"planned" | "in-progress" | "completed">("planned");
   const [newStepDesc, setNewStepDesc] = useState("");
+
+  // Timeline Step Edit Modal State
+  const [isEditStepModalOpen, setIsEditStepModalOpen] = useState(false);
+  const [editingStep, setEditingStep] = useState<TimelineStep | null>(null);
+  const [editStepTitle, setEditStepTitle] = useState("");
+  const [editStepDate, setEditStepDate] = useState("");
+  const [editStepTiming, setEditStepTiming] = useState("");
+  const [editStepStatus, setEditStepStatus] = useState<"planned" | "in-progress" | "completed">("planned");
+  const [editStepDesc, setEditStepDesc] = useState("");
 
   // Egregora Chat State (Persistent)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
@@ -409,9 +422,13 @@ export default function App() {
     if (selectedInvId === id) setSelectedInvId(null);
   };
 
-  // 7. Add step to investigation timeline
+  // 7. Add step to investigation timeline (Con data personalizzabile e calcolo lunare)
   const addTimelineStep = () => {
     if (!newStepTitle.trim() || !selectedInvId) return;
+
+    const chosenDate = newStepDate || new Date().toISOString().split("T")[0];
+    const computedLunar = getMoonPhaseData(new Date(chosenDate));
+    const timingStr = newStepTiming.trim() || `${computedLunar.phaseName} (${computedLunar.zodiacName.split(" ")[0]})`;
 
     setInvestigations(
       investigations.map((inv) => {
@@ -422,7 +439,8 @@ export default function App() {
               id: `st-${Date.now()}`,
               title: newStepTitle,
               status: newStepStatus,
-              date: new Date().toISOString().split("T")[0],
+              date: chosenDate,
+              planetaryTiming: timingStr,
               desc: newStepDesc
             }
           ];
@@ -444,9 +462,60 @@ export default function App() {
     // Reset inputs & close
     setNewStepTitle("");
     setNewStepDesc("");
+    setNewStepTiming("");
     setNewStepStatus("planned");
     setIsStepModalOpen(false);
     playKeyClick(700);
+  };
+
+  // Open Edit Modal for a timeline step
+  const openEditStepModal = (step: TimelineStep) => {
+    setEditingStep(step);
+    setEditStepTitle(step.title);
+    setEditStepDate(step.date || new Date().toISOString().split("T")[0]);
+    setEditStepTiming(step.planetaryTiming || "");
+    setEditStepStatus(step.status);
+    setEditStepDesc(step.desc);
+    setIsEditStepModalOpen(true);
+  };
+
+  // Save changes to an edited timeline step
+  const saveEditedTimelineStep = () => {
+    if (!editingStep || !selectedInvId || !editStepTitle.trim()) return;
+
+    const chosenDate = editStepDate || new Date().toISOString().split("T")[0];
+    const computedLunar = getMoonPhaseData(new Date(chosenDate));
+    const timingStr = editStepTiming.trim() || `${computedLunar.phaseName} (${computedLunar.zodiacName.split(" ")[0]})`;
+
+    setInvestigations(
+      investigations.map((inv) => {
+        if (inv.id === selectedInvId) {
+          const updatedTimeline = inv.timeline.map((s) => {
+            if (s.id === editingStep.id) {
+              return {
+                ...s,
+                title: editStepTitle,
+                date: chosenDate,
+                planetaryTiming: timingStr,
+                status: editStepStatus,
+                desc: editStepDesc
+              };
+            }
+            return s;
+          });
+
+          const completedCount = updatedTimeline.filter((s) => s.status === "completed").length;
+          const progress = Math.round((completedCount / updatedTimeline.length) * 100);
+
+          return { ...inv, timeline: updatedTimeline, progress };
+        }
+        return inv;
+      })
+    );
+
+    setEditingStep(null);
+    setIsEditStepModalOpen(false);
+    playKeyClick(600);
   };
 
   // 8. Delete timeline step
@@ -653,6 +722,71 @@ export default function App() {
     playMysticChime();
   };
 
+  const generateConsecrationProtocolForInv = (invId: string) => {
+    const inv = investigations.find(i => i.id === invId);
+    if (!inv) return;
+
+    const reqName = inv.involvedPeople?.find(p => p.role.includes("Richiedente"))?.name || "il Richiedente";
+    const targetName = inv.involvedPeople?.find(p => p.role.includes("Bersaglio") || p.role.includes("Target"))?.name || "il Bersaglio";
+
+    const newProtocol: ConsecrationProtocol = {
+      title: `Consacrazione Operativa & Carica Sigillo (${reqName} / ${targetName})`,
+      verbalFormula: `Nel nome del Principio Unico Ermetico e per la sincera Volontà del Richiedente (${reqName}), io consacro questo Sigillo e i simulacri del contesto. Sia la luce dell'Aether a penetrare ogni fibra, sia la frequenza di riallineamento a dissolvere ogni nodo tra le parti.`,
+      ptahPendulum: {
+        activates: `Attiva il vortice orario di sintonizzazione con la frequenza di riallineamento energetico di ${reqName}, canalizzando la trazione d'Aether verso lo scopo.`,
+        dissipates: `Dissipa le congestioni eteriche, i nodi karmici di stasi, le larve mentali ossessive e ogni carica di invidia o malocchio presente su ${targetName}.`
+      },
+      nubianPyramid: {
+        activates: `Attiva la focalizzazione del fascio di proiezione verticale (sezione aurea ad alta elevazione), concentrando l'intento del Sigillo radionico con massima tensione causale.`,
+        dissipates: `Dissipa le interferenze astrali estreme, i parassiti e gli attacchi psichici esterni, schermando l'operazione da sguardi indiscreti.`
+      },
+      cleansingSteps: [
+        "Incenso di Mirra e Olibano steso in senso orario attorno allo scrittoio/altare.",
+        "Attivazione della rotazione del Pendolo Ptah sul testimone/foto per 3 minuti fino all'arresto naturale.",
+        "Posizionamento del Sigillo sotto il vertice della Piramide Nubiana per la carica risonante.",
+        "Chiusura e ringraziamento con estinzione della fiamma."
+      ]
+    };
+
+    setInvestigations(prev => prev.map(i => {
+      if (i.id === invId) {
+        return { ...i, consecrationProtocol: newProtocol };
+      }
+      return i;
+    }));
+
+    playMysticChime();
+  };
+
+  const generateCaseClosureForInv = (invId: string) => {
+    const inv = investigations.find(i => i.id === invId);
+    if (!inv) return;
+
+    const reqName = inv.involvedPeople?.find(p => p.role.includes("Richiedente"))?.name || "il Richiedente";
+    const targetName = inv.involvedPeople?.find(p => p.role.includes("Bersaglio") || p.role.includes("Target"))?.name || "il Bersaglio";
+
+    const closureText = `Dichiarazione Solenne di Chiusura e Sigillatura del Fascicolo:
+
+Il presente fascicolo d'indagine d'Arte Ermetica riguardante il Richiedente (${reqName}) e il Bersaglio (${targetName}) viene solennemente sigillato.
+
+Esito e Verifica Operativa:
+- Diagnosi Elementale: Registrata e bilanciata sotto l'archetipo ${inv.archetype}.
+- Feticci e Simulacri: ${inv.fetishes?.length || 0} testimoni valutati e trattati in chiave immaginale.
+- Bando & Protezione: Schermatura attiva ed eretta attorno ai soggetti coinvolti.
+- Consacrazione: Sigillo caricato tramite il Pendolo Ptah e la Piramide Nubiana.
+
+Ogni forza mossa ha trovato la sua direzione di riequilibrio; la Volontà impressa opera senza ostacoli nel piano causale. Il fascicolo è solennemente CHIUSO E SIGILLATO. Così è, così sia.`;
+
+    setInvestigations(prev => prev.map(i => {
+      if (i.id === invId) {
+        return { ...i, caseClosureText: closureText };
+      }
+      return i;
+    }));
+
+    playMysticChime();
+  };
+
   const calculatePlanetaryDatesForInv = (invId: string) => {
     const inv = investigations.find(i => i.id === invId);
     if (!inv) return;
@@ -740,313 +874,355 @@ export default function App() {
     playMysticChime();
   };
 
-  // 10b. Export & Share functions
+  // 10b. Export PDF via direct jsPDF download (solves OXPS printing issue)
   const exportPDF = (inv: Investigation) => {
-    const win = window.open("", "_blank");
-    if (!win) {
-      alert("I popup sono bloccati dal browser. Abilita i popup per visualizzare la stampa PDF.");
-      return;
+    try {
+      const doc = new jsPDF();
+      let y = 18;
+
+      const checkPageBreak = (needed: number = 15) => {
+        if (y + needed > 275) {
+          doc.addPage();
+          y = 18;
+        }
+      };
+
+      // Header Banner
+      doc.setFillColor(18, 15, 36);
+      doc.rect(14, y, 182, 22, "F");
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(223, 177, 91); // Gold
+      doc.text("SISTEMA OPERATIVO ESOTERICO • FASCICOLO D'INDAGINE", 20, y + 9);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`TITOLO: ${inv.title.toUpperCase()}`, 20, y + 17);
+
+      y += 28;
+
+      // Meta grid
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`ID Fascicolo: ${inv.id}`, 20, y);
+      doc.text(`Archetipo: ${inv.archetype}`, 85, y);
+      doc.text(`Apertura: ${inv.createdDate}`, 145, y);
+      y += 6;
+      doc.text(`Progresso Operativo: ${inv.progress}%`, 20, y);
+      doc.text(`Referente Titolare: ${operatorSignature}`, 85, y);
+      y += 10;
+
+      doc.setDrawColor(223, 177, 91);
+      doc.line(20, y, 190, y);
+      y += 8;
+
+      // Section 1: Nomi e dati soggetti coinvolti (Richiedente / Target)
+      checkPageBreak(25);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("1) NOMI E DATI DELLE PERSONE COINVOLTE (Richiedente / Target)", 20, y);
+      y += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(40, 40, 40);
+
+      if (inv.involvedPeople && inv.involvedPeople.length > 0) {
+        inv.involvedPeople.forEach(p => {
+          checkPageBreak(12);
+          doc.text(`• ${p.name} [Ruolo: ${p.role}] ${p.birthDate ? `- Nascita: ${p.birthDate}` : ''}`, 22, y);
+          y += 5;
+          if (p.notes) {
+            const noteLines = doc.splitTextToSize(`Note: ${p.notes}`, 160);
+            noteLines.forEach((l: string) => {
+              checkPageBreak(6);
+              doc.text(`  ${l}`, 24, y);
+              y += 5;
+            });
+          }
+        });
+      } else {
+        doc.text("• Nessun dato soggetto aggiuntivo specificato oltre al Richiedente.", 22, y);
+        y += 6;
+      }
+      y += 4;
+
+      // Section 2: Domanda d'indagine
+      checkPageBreak(25);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("2) DOMANDA D'INDAGINE & QUESITO SOLENNE", 20, y);
+      y += 6;
+
+      doc.setFont("times", "italic");
+      doc.setFontSize(10);
+      doc.setTextColor(30, 30, 30);
+      const qText = inv.investigationQuestion || inv.description;
+      const qLines = doc.splitTextToSize(`"${qText}"`, 165);
+      qLines.forEach((l: string) => {
+        checkPageBreak(6);
+        doc.text(l, 22, y);
+        y += 5;
+      });
+      y += 4;
+
+      // Section 3: Studio del Caso e Diagnosi Alchemica (Punto di Partenza, Punto di Arrivo, Riequilibrio)
+      checkPageBreak(35);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("3) STUDIO DEL CASO & DIAGNOSI ALCHEMICA GENERATA", 20, y);
+      y += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(40, 40, 40);
+
+      const startPt = inv.diagnosis?.startingPoint || `Punto di Partenza: Rilevato squilibrio dominante nell'archetipo ${inv.archetype}. Tensione tra le correnti dell'elemento Fuoco/Acqua tra Richiedente e Bersaglio.`;
+      const targetPt = inv.diagnosis?.targetPoint || `Punto di Arrivo: Reintegrazione della coesione elementale, dissoluzione delle proiezioni tossiche e stabilizzazione della sovranità del Richiedente.`;
+      const reqPlan = inv.diagnosis?.rebalancingPlan || `Riequilibrio Operativo: Trasmutazione dell'eccesso tramite bando mirato, carica del sigillo e allineamento radiestesico.`;
+
+      [
+        { title: "Punto di Partenza (Diagnosi di Squilibrio Rilevato):", body: startPt },
+        { title: "Punto di Arrivo (Obiettivo Desiderato ed Equilibrio):", body: targetPt },
+        { title: "Riequilibrio Operativo (Piano di Trasmutazione):", body: reqPlan }
+      ].forEach(item => {
+        checkPageBreak(15);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(124, 58, 237);
+        doc.text(item.title, 22, y);
+        y += 5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(40, 40, 40);
+        const bLines = doc.splitTextToSize(item.body, 160);
+        bLines.forEach((l: string) => {
+          checkPageBreak(6);
+          doc.text(l, 24, y);
+          y += 5;
+        });
+        y += 2;
+      });
+
+      if (inv.diagnosis?.elements) {
+        checkPageBreak(10);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Equilibrio Elementale: Fuoco ${inv.diagnosis.elements.fire}% | Acqua ${inv.diagnosis.elements.water}% | Terra ${inv.diagnosis.elements.earth}% | Aria ${inv.diagnosis.elements.air}%`, 22, y);
+        y += 6;
+      }
+      y += 4;
+
+      // Section 4: Valutazione Feticci & Simulacri
+      checkPageBreak(25);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("4) VALUTAZIONE FETICCI, FOTO E SIMULACRI IMMAGINALI", 20, y);
+      y += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(40, 40, 40);
+
+      if (inv.fetishes && inv.fetishes.length > 0) {
+        inv.fetishes.forEach(f => {
+          checkPageBreak(12);
+          doc.text(`• ${f.name} [Tipo: ${f.type}, Elemento: ${f.elementalAffinity || 'N/A'}]: ${f.description}`, 22, y);
+          y += 6;
+        });
+      } else {
+        doc.text("• Nessun feticcio o testimone fisico caricato.", 22, y);
+        y += 6;
+      }
+      y += 4;
+
+      // Section 5: Bando Preliminare di Protezione
+      checkPageBreak(25);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("5) BANDO PRELIMINARE DI PROTEZIONE (Schermatura Parti)", 20, y);
+      y += 6;
+
+      if (inv.protectiveBanishment) {
+        checkPageBreak(15);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(40, 40, 40);
+        doc.text(`Titolo: ${inv.protectiveBanishment.title}`, 22, y);
+        y += 5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.text(`Targets: ${inv.protectiveBanishment.targetProtection}`, 22, y);
+        y += 5;
+
+        doc.setFont("times", "italic");
+        const bFormulaLines = doc.splitTextToSize(`Formula: "${inv.protectiveBanishment.formula}"`, 160);
+        bFormulaLines.forEach((l: string) => {
+          checkPageBreak(6);
+          doc.text(l, 24, y);
+          y += 5;
+        });
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text("• Bando di protezione solenne in fase di allineamento.", 22, y);
+        y += 6;
+      }
+      y += 4;
+
+      // Section 6: Consacrazione Operativa & Strumenti Alchemici (Pendolo Ptah & Piramide Nubiana)
+      checkPageBreak(35);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("6) CONSACRAZIONE OPERATIVA, CARICA SIGILLO & STRUMENTI", 20, y);
+      y += 6;
+
+      const cp = inv.consecrationProtocol || {
+        title: "Consacrazione Operativa & Carica del Sigillo",
+        verbalFormula: "In nome del Principio Unico e per la Volontà coordinata del Richiedente, io consacro questo Sigillo e questo testimone. Sia la luce a guidare ogni fibra, sia la forza a dissolvere ogni nodo.",
+        ptahPendulum: {
+          activates: "Attiva la sintonizzazione radiestesica oraria e il flusso di carica ad alta frequenza tra il Richiedente e lo scopo.",
+          dissipates: "Dissipa le congestioni eteriche, i blocchi di ansia, le negatività riflesse e il ristagno emozionale."
+        },
+        nubianPyramid: {
+          activates: "Attiva la concentrazione della geometria sacra ad alta elevazione, potenziando la carica radionica del Sigillo.",
+          dissipates: "Dissipa le interferenze astrali estreme, i parassiti e gli attacchi psichici, schermando l'operazione."
+        }
+      };
+
+      checkPageBreak(15);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(124, 58, 237);
+      doc.text("Formulazione Verbale (Invocazione Solenne):", 22, y);
+      y += 5;
+
+      doc.setFont("times", "italic");
+      doc.setTextColor(30, 30, 30);
+      const vfLines = doc.splitTextToSize(`"${cp.verbalFormula}"`, 160);
+      vfLines.forEach((l: string) => {
+        checkPageBreak(6);
+        doc.text(l, 24, y);
+        y += 5;
+      });
+      y += 3;
+
+      checkPageBreak(15);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(124, 58, 237);
+      doc.text("Pendolo Ptah (Iside/Ptah Radiestesico Egizio):", 22, y);
+      y += 5;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 40, 40);
+      doc.text(`• Cosa Attiva: ${cp.ptahPendulum.activates}`, 24, y);
+      y += 5;
+      doc.text(`• Cosa Dissipa: ${cp.ptahPendulum.dissipates}`, 24, y);
+      y += 7;
+
+      checkPageBreak(15);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(124, 58, 237);
+      doc.text("Piramide Nubiana (Geometria Sacra Aurea):", 22, y);
+      y += 5;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 40, 40);
+      doc.text(`• Cosa Attiva: ${cp.nubianPyramid.activates}`, 24, y);
+      y += 5;
+      doc.text(`• Cosa Dissipa: ${cp.nubianPyramid.dissipates}`, 24, y);
+      y += 8;
+
+      // Section 7: Timeline degli Step Operativi
+      checkPageBreak(30);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("7) TIMELINE DEGLI STEP OPERATIVI (Calcolo Lunare & Planetario)", 20, y);
+      y += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(40, 40, 40);
+
+      inv.timeline.forEach((step, idx) => {
+        checkPageBreak(15);
+        const statusLabel = step.status === "completed" ? "[FATTO]" : step.status === "in-progress" ? "[IN CORSO]" : "[PIANIFICATO]";
+        doc.setFont("helvetica", "bold");
+        doc.text(`${idx + 1}. ${statusLabel} ${step.title} (${step.date})`, 22, y);
+        y += 4.5;
+
+        if (step.planetaryTiming) {
+          doc.setFont("helvetica", "italic");
+          doc.setTextColor(100, 100, 100);
+          doc.text(`   Corrispondenza Astrale: ${step.planetaryTiming}`, 22, y);
+          y += 4.5;
+        }
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(50, 50, 50);
+        const sLines = doc.splitTextToSize(`   Note: ${step.desc}`, 160);
+        sLines.forEach((l: string) => {
+          checkPageBreak(5);
+          doc.text(l, 22, y);
+          y += 4.5;
+        });
+        y += 2;
+      });
+      y += 4;
+
+      // Section 8: Sigillatura e Chiusura Solenne del Fascicolo
+      checkPageBreak(30);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(223, 177, 91);
+      doc.text("8) SIGILLATURA & CHIUSURA SOLENNE DEL FASCICOLO", 20, y);
+      y += 6;
+
+      const closing = inv.caseClosureText || `Il presente fascicolo d'indagine d'Arte Ermetica per il Richiedente e le parti coinvolte viene solennemente sigillato. Ogni operazione è stata compiuta nell'alveo della giustizia alchemica; lo scudo di protezione è saldamente eretto e la Volontà impressa opera senza ostacoli nel piano causale. Così è, così sia.`;
+
+      doc.setFont("times", "italic");
+      doc.setFontSize(9.5);
+      doc.setTextColor(30, 30, 30);
+      const cLines = doc.splitTextToSize(`"${closing}"`, 165);
+      cLines.forEach((l: string) => {
+        checkPageBreak(6);
+        doc.text(l, 22, y);
+        y += 5;
+      });
+      y += 12;
+
+      // Signature Block
+      checkPageBreak(25);
+      doc.setDrawColor(223, 177, 91);
+      doc.line(120, y, 185, y);
+      y += 5;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text("REFERENTE / TITOLARE DEL FASCICOLO", 120, y);
+      y += 5;
+      doc.setFont("times", "bolditalic");
+      doc.setFontSize(10.5);
+      doc.setTextColor(20, 20, 20);
+      doc.text(operatorSignature, 120, y);
+
+      // Save standard PDF Blob download directly
+      const cleanFileName = inv.title.replace(/[^a-zA-Z0-9_-]/g, "_");
+      doc.save(`Fascicolo_Indagine_${cleanFileName}.pdf`);
+      playMysticChime();
+    } catch (e: any) {
+      console.error("PDF generation error:", e);
+      alert("Errore durante la generazione del PDF: " + (e.message || e));
     }
-    
-    const timelineHTML = inv.timeline.map(step => `
-      <div class="step-card">
-        <div class="step-header">
-          <span class="step-title">${step.title}</span>
-          <span class="step-status status-${step.status}">${step.status === "completed" ? "Fatto" : step.status === "in-progress" ? "In Corso" : "Pianificato"}</span>
-        </div>
-        <div class="step-date">${step.date}</div>
-        <div class="step-desc">${step.desc}</div>
-      </div>
-    `).join("");
-
-    const mediaHTML = inv.media.map(item => `
-      <div class="media-card">
-        <span class="media-name">${item.name}</span>
-        <span class="media-type">(${item.type})</span>
-        ${item.type === "image" && item.url ? `<img src="${item.url}" class="media-img" />` : ""}
-        ${item.type === "text" && item.content ? `<div class="media-content">${item.content}</div>` : ""}
-      </div>
-    `).join("");
-
-    win.document.write(`
-      <!DOCTYPE html>
-      <html lang="it">
-      <head>
-        <meta charset="UTF-8">
-        <title>Dossier: ${inv.title}</title>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap');
-          
-          body {
-            font-family: 'Inter', sans-serif;
-            background-color: #ffffff;
-            color: #111827;
-            margin: 0;
-            padding: 40px;
-            line-height: 1.6;
-          }
-          
-          .header {
-            border-bottom: 2px solid #dfb15b;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-            text-align: center;
-          }
-          
-          .system-title {
-            font-family: 'Cinzel', serif;
-            font-size: 11px;
-            letter-spacing: 4px;
-            color: #dfb15b;
-            margin: 0 0 5px 0;
-            text-transform: uppercase;
-          }
-          
-          .title {
-            font-family: 'Cinzel', serif;
-            font-size: 24px;
-            margin: 5px 0 10px 0;
-            color: #111827;
-          }
-          
-          .meta-grid {
-            display: grid;
-            grid-template-cols: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 30px;
-            font-size: 12px;
-            background-color: #f9fafb;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-          }
-          
-          .meta-item strong {
-            color: #374151;
-          }
-          
-          .meta-item span {
-            color: #111827;
-            font-family: 'JetBrains Mono', monospace;
-          }
-          
-          .description-box {
-            border-left: 3px solid #dfb15b;
-            padding-left: 15px;
-            margin-bottom: 35px;
-            font-style: italic;
-            color: #374151;
-            font-size: 14px;
-          }
-          
-          .section-title {
-            font-family: 'Cinzel', serif;
-            font-size: 14px;
-            border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 5px;
-            margin-top: 40px;
-            margin-bottom: 20px;
-            color: #dfb15b;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-          }
-          
-          .step-card {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px dashed #e5e7eb;
-          }
-          
-          .step-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 5px;
-          }
-          
-          .step-title {
-            font-weight: 600;
-            font-size: 14px;
-            color: #111827;
-          }
-          
-          .step-status {
-            font-size: 10px;
-            text-transform: uppercase;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-weight: bold;
-          }
-          
-          .status-completed {
-            background-color: #ecfdf5;
-            color: #047857;
-            border: 1px solid #a7f3d0;
-          }
-          
-          .status-in-progress {
-            background-color: #fffbeb;
-            color: #b45309;
-            border: 1px solid #fde68a;
-          }
-          
-          .status-planned {
-            background-color: #f3f4f6;
-            color: #4b5563;
-            border: 1px solid #e5e7eb;
-          }
-          
-          .step-date {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            color: #6b7280;
-            margin-bottom: 5px;
-          }
-          
-          .step-desc {
-            font-size: 13px;
-            color: #4b5563;
-          }
-          
-          .media-grid {
-            display: grid;
-            grid-template-cols: 1fr;
-            gap: 20px;
-          }
-          
-          .media-card {
-            border: 1px solid #e5e7eb;
-            padding: 15px;
-            border-radius: 8px;
-            background-color: #f9fafb;
-          }
-          
-          .media-name {
-            font-weight: 600;
-            font-size: 12px;
-            color: #111827;
-          }
-          
-          .media-type {
-            font-size: 10px;
-            color: #6b7280;
-            margin-left: 5px;
-          }
-          
-          .media-img {
-            max-width: 100%;
-            max-height: 250px;
-            display: block;
-            margin-top: 10px;
-            border-radius: 4px;
-            border: 1px solid #e5e7eb;
-          }
-          
-          .media-content {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            background-color: #ffffff;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #e5e7eb;
-            margin-top: 10px;
-            white-space: pre-wrap;
-            color: #374151;
-          }
-          
-          .footer {
-            margin-top: 60px;
-            text-align: center;
-            font-size: 10px;
-            color: #9ca3af;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 20px;
-          }
-
-          .signature-section {
-            margin-top: 50px;
-            display: flex;
-            justify-content: flex-end;
-            text-align: right;
-            page-break-inside: avoid;
-          }
-          .signature-box {
-            display: inline-block;
-            border-top: 1px solid #dfb15b;
-            padding-top: 10px;
-            min-width: 250px;
-          }
-          .signature-label {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #6b7280;
-            margin-bottom: 6px;
-          }
-          .signature-value {
-            font-family: 'Cinzel', serif;
-            font-size: 13px;
-            font-weight: bold;
-            color: #111827;
-            font-style: italic;
-          }
-          
-          @media print {
-            body {
-              padding: 0;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1 class="system-title">MAGIA OPERATIVA • REPERTO ESOTERICO</h1>
-          <h2 class="title">${inv.title}</h2>
-        </div>
-        
-        <div class="meta-grid">
-          <div class="meta-item"><strong>ARCHETIPO:</strong> <span>${inv.archetype}</span></div>
-          <div class="meta-item"><strong>DATA APERTURA:</strong> <span>${inv.createdDate}</span></div>
-          <div class="meta-item"><strong>PROGRESSO:</strong> <span>${inv.progress}%</span></div>
-          <div class="meta-item"><strong>FASCICOLO ID:</strong> <span>${inv.id}</span></div>
-        </div>
-        
-        <div class="description-box">
-          "${inv.description}"
-        </div>
-        
-        <div class="section-title">Timeline delle Operazioni</div>
-        <div class="timeline-container">
-          ${timelineHTML || '<p style="font-size:12px; color:#6b7280; font-style:italic;">Nessuno step registrato.</p>'}
-        </div>
-        
-        <div class="section-title">Reperti e Allegati</div>
-        <div class="media-grid">
-          ${mediaHTML || '<p style="font-size:12px; color:#6b7280; font-style:italic;">Nessun reperto allegato.</p>'}
-        </div>
-
-        <div class="signature-section">
-          <div class="signature-box">
-            <div class="signature-label">Operatore dell'Arte / Titolare</div>
-            <div class="signature-value">${operatorSignature}</div>
-          </div>
-        </div>
-        
-        <div class="footer">
-          Fascicolo autogestito tramite Magia Operativa - Sistema Operativo Esoterico • Tarot Italia.
-        </div>
-        
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 500);
-          };
-        </script>
-      </body>
-      </html>
-    `);
-    win.document.close();
   };
 
   const exportJSON = (inv: Investigation) => {
@@ -2218,12 +2394,58 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                       </div>
                     </div>
 
-                    {/* SECTION 3: RISPOSTA ANALIZZATA E GENERATA NELLA TIMELINE (Req #3) */}
+                    {/* SECTION 3: STUDIO DEL CASO & DIAGNOSI ALCHEMICA GENERATA (Req #3) */}
+                    <div className="bg-[#120f24] border border-amber-500/40 rounded-xl p-4 space-y-3.5 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-amber-400 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-amber-400" />
+                          <span>3) Studio del Caso & Diagnosi Alchemica Generata</span>
+                        </h3>
+                        <span className="text-[10px] text-amber-400 font-mono uppercase font-bold">{inv.archetype}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        {/* Punto di Partenza */}
+                        <div className="bg-[#080612] border border-red-500/30 p-3 rounded-lg space-y-1.5">
+                          <span className="text-[10px] font-mono font-bold text-red-400 uppercase tracking-wider block">📍 Punto di Partenza (Squilibrio)</span>
+                          <p className="text-gray-300 leading-relaxed font-serif text-[11px]">
+                            {inv.diagnosis?.startingPoint || `Analisi iniziale: squilibrio dominante nell'archetipo ${inv.archetype}. Tensione tra le correnti tra Richiedente e Bersaglio.`}
+                          </p>
+                        </div>
+
+                        {/* Punto di Arrivo */}
+                        <div className="bg-[#080612] border border-emerald-500/30 p-3 rounded-lg space-y-1.5">
+                          <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block">🎯 Punto di Arrivo (Obiettivo)</span>
+                          <p className="text-gray-300 leading-relaxed font-serif text-[11px]">
+                            {inv.diagnosis?.targetPoint || `Reintegrazione della coesione elementale, dissoluzione delle trappole proiettive e sovranità del Richiedente.`}
+                          </p>
+                        </div>
+
+                        {/* Riequilibrio Operativo */}
+                        <div className="bg-[#080612] border border-purple-500/30 p-3 rounded-lg space-y-1.5">
+                          <span className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-wider block">⚖️ Riequilibrio Operativo</span>
+                          <p className="text-gray-300 leading-relaxed font-serif text-[11px]">
+                            {inv.diagnosis?.rebalancingPlan || `Trasmutazione dell'eccesso tramite bando mirato, carica del sigillo radionico e allineamento radiestesico.`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {inv.diagnosis?.elements && (
+                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-[#2b244d]/40 text-center font-mono text-[10px]">
+                          <div className="bg-red-950/20 border border-red-500/30 p-1.5 rounded text-red-300">🔥 Fuoco {inv.diagnosis.elements.fire}%</div>
+                          <div className="bg-blue-950/20 border border-blue-500/30 p-1.5 rounded text-blue-300">💧 Acqua {inv.diagnosis.elements.water}%</div>
+                          <div className="bg-amber-950/20 border border-amber-500/30 p-1.5 rounded text-amber-300">⛰️ Terra {inv.diagnosis.elements.earth}%</div>
+                          <div className="bg-sky-950/20 border border-sky-500/30 p-1.5 rounded text-sky-300">💨 Aria {inv.diagnosis.elements.air}%</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECTION 4: RISPOSTA ANALIZZATA E GENERATA DALL'EGREGORA */}
                     <div className="bg-[#120f24] border border-purple-500/40 rounded-xl p-4 space-y-3 shadow-lg">
                       <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
                         <h3 className="font-serif text-xs md:text-sm font-bold text-purple-300 flex items-center gap-2">
                           <MessageSquare className="w-4 h-4 text-purple-400" />
-                          <span>3) Risposta Analizzata e Generata dall'Egregora</span>
+                          <span>4) Risposta Analizzata e Generata dall'Egregora</span>
                         </h3>
                         <button
                           onClick={() => {
@@ -2251,33 +2473,6 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                           </p>
                         )}
                       </div>
-                    </div>
-
-                    {/* SECTION 4: APERTURA FASCICOLO E DIAGNOSI (Req #4) */}
-                    <div className="bg-[#120f24] border border-[#2b244d] rounded-xl p-4 space-y-3.5 shadow-lg">
-                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
-                        <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-[#dfb15b]" />
-                          <span>4) Apertura Fascicolo e Diagnosi Alchemica del Caso</span>
-                        </h3>
-                        <span className="text-[10px] text-[#dfb15b] font-mono font-bold uppercase">{inv.archetype}</span>
-                      </div>
-
-                      {inv.diagnosis ? (
-                        <div className="bg-[#080612] border border-[#2b244d] p-3 rounded-lg space-y-2">
-                          <p className="text-xs text-gray-300 italic">{inv.diagnosis.description}</p>
-                          <div className="grid grid-cols-4 gap-2 pt-2 border-t border-[#2b244d]/40 text-center font-mono text-[10px]">
-                            <div className="bg-red-950/20 border border-red-500/30 p-1.5 rounded text-red-300">🔥 Fuoco {inv.diagnosis.elements.fire}%</div>
-                            <div className="bg-blue-950/20 border border-blue-500/30 p-1.5 rounded text-blue-300">💧 Acqua {inv.diagnosis.elements.water}%</div>
-                            <div className="bg-amber-950/20 border border-amber-500/30 p-1.5 rounded text-amber-300">⛰️ Terra {inv.diagnosis.elements.earth}%</div>
-                            <div className="bg-sky-950/20 border border-sky-500/30 p-1.5 rounded text-sky-300">💨 Aria {inv.diagnosis.elements.air}%</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-[#080612] border border-[#2b244d] p-3 rounded-lg text-xs text-gray-400 italic">
-                          Fascicolo aperto sotto l'archetipo {inv.archetype}. Diagnosi elementale predefinita in corso.
-                        </div>
-                      )}
                     </div>
 
                     {/* SECTION 5: VALUTAZIONE FETICCI, FOTO E SIMULACRI IMMAGINALI (Req #5) */}
@@ -2368,12 +2563,12 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                       </div>
                     </div>
 
-                    {/* SECTION 6: BANDO PRELIMINARE DI PROTEZIONE (Req #6) */}
+                    {/* BANDO PRELIMINARE DI PROTEZIONE */}
                     <div className="bg-[#120f24] border border-purple-500/40 rounded-xl p-4 space-y-3 shadow-lg">
                       <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
                         <h3 className="font-serif text-xs md:text-sm font-bold text-purple-300 flex items-center gap-2">
                           <ShieldCheck className="w-4 h-4 text-purple-400" />
-                          <span>6) Bando Preliminare di Protezione (Operatore e Parti)</span>
+                          <span>Bando Preliminare di Protezione (Schermatura Parti)</span>
                         </h3>
                         <button
                           onClick={() => generateProtectiveBanishmentForInv(inv.id)}
@@ -2389,7 +2584,6 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-gray-300 font-mono">
                             <div> Timing: <span className="text-purple-200">{inv.protectiveBanishment.timing}</span></div>
                             <div> Targets: <span className="text-purple-200">{inv.protectiveBanishment.targetProtection}</span></div>
-                            <div> Corrispondenze: Candela {inv.protectiveBanishment.candle}, Incenso {inv.protectiveBanishment.incense}</div>
                           </div>
                           <div className="bg-purple-950/30 border-l-2 border-purple-500 p-2.5 rounded text-purple-100 font-serif italic text-xs leading-relaxed">
                             "{inv.protectiveBanishment.formula}"
@@ -2397,7 +2591,74 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                         </div>
                       ) : (
                         <p className="text-xs text-gray-400 italic bg-[#080612] p-3 rounded-lg border border-[#2b244d]">
-                          Nessun bando di protezione solenne ancora generato. Clicca su 'Genera Bando Solenne' per consacrare lo scudo di schermatura per Operatore e soggetti coinvolti.
+                          Nessun bando di protezione solenne ancora generato. Clicca su 'Genera Bando Solenne' per consacrare lo scudo di schermatura per Richiedente e soggetti.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* SECTION 6: CONSACRAZIONE OPERATIVA & CARICA SIGILLO (Req #6 - Pendolo Ptah & Piramide Nubiana) */}
+                    <div className="bg-[#120f24] border border-[#dfb15b]/50 rounded-xl p-4 space-y-3.5 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-2">
+                          <Wand2 className="w-4 h-4 text-[#dfb15b]" />
+                          <span>6) Consacrazione Operativa & Carica Sigillo (Pendolo Ptah & Piramide Nubiana)</span>
+                        </h3>
+                        <button
+                          onClick={() => generateConsecrationProtocolForInv(inv.id)}
+                          className="text-[10px] text-[#dfb15b] bg-[#dfb15b]/10 border border-[#dfb15b]/50 px-2.5 py-1 rounded-lg hover:bg-[#dfb15b]/20 font-serif font-semibold"
+                        >
+                          ⚡ {inv.consecrationProtocol ? "Rigenera Consacrazione" : "Genera Protocollo Consacrazione"}
+                        </button>
+                      </div>
+
+                      {inv.consecrationProtocol ? (
+                        <div className="bg-[#080612] border border-[#dfb15b]/30 p-3.5 rounded-lg space-y-3 text-xs">
+                          <h4 className="font-serif font-bold text-white text-sm">{inv.consecrationProtocol.title}</h4>
+                          
+                          {/* Verbal Formula */}
+                          <div className="bg-[#120f24] border-l-2 border-[#dfb15b] p-3 rounded-r-lg text-amber-100 font-serif italic text-xs leading-relaxed">
+                            <span className="text-[9px] uppercase font-bold text-[#dfb15b] tracking-wider block not-italic mb-1">Formulazione Verbale & Decreto di Carica:</span>
+                            "{inv.consecrationProtocol.verbalFormula}"
+                          </div>
+
+                          {/* Esoteric Tools Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                            {/* Pendolo Ptah */}
+                            <div className="bg-[#120f24] border border-purple-500/30 p-3 rounded-lg space-y-1.5">
+                              <span className="font-serif font-bold text-purple-300 text-xs flex items-center gap-1.5">
+                                🔮 Pendolo Ptah (Iside/Ptah Radiestesico Egizio)
+                              </span>
+                              <div className="text-[11px] text-gray-300 space-y-1 font-sans">
+                                <div><strong className="text-emerald-400 font-mono text-[10px]">Cosa Attiva:</strong> {inv.consecrationProtocol.ptahPendulum.activates}</div>
+                                <div><strong className="text-red-400 font-mono text-[10px]">Cosa Dissipa:</strong> {inv.consecrationProtocol.ptahPendulum.dissipates}</div>
+                              </div>
+                            </div>
+
+                            {/* Piramide Nubiana */}
+                            <div className="bg-[#120f24] border border-amber-500/30 p-3 rounded-lg space-y-1.5">
+                              <span className="font-serif font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                                🔺 Piramide Nubiana (Geometria Sacra Aurea)
+                              </span>
+                              <div className="text-[11px] text-gray-300 space-y-1 font-sans">
+                                <div><strong className="text-emerald-400 font-mono text-[10px]">Cosa Attiva:</strong> {inv.consecrationProtocol.nubianPyramid.activates}</div>
+                                <div><strong className="text-red-400 font-mono text-[10px]">Cosa Dissipa:</strong> {inv.consecrationProtocol.nubianPyramid.dissipates}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Cleansing Steps */}
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Passaggi di Pulizia & Carica:</span>
+                            <ul className="list-disc list-inside text-[11px] text-gray-300 space-y-0.5 font-serif">
+                              {inv.consecrationProtocol.cleansingSteps.map((st, i) => (
+                                <li key={i}>{st}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic bg-[#080612] p-3 rounded-lg border border-[#2b244d]">
+                          Nessun protocollo di consacrazione ancora generato. Clicca su 'Genera Protocollo Consacrazione' per formulare la ritualistica con Pendolo Ptah e Piramide Nubiana.
                         </p>
                       )}
                     </div>
@@ -2433,8 +2694,8 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                         {inv.timeline.length === 0 ? (
                           <p className="text-xs text-gray-500 italic pl-2">Nessun passaggio ritmico registrato. Clicca su 'Auto-Calcola Date' per popolare la timeline.</p>
                         ) : (
-                          inv.timeline.map((step, idx) => (
-                            <div key={step.id} className="relative group/step bg-[#080612]/70 p-2.5 rounded-lg border border-[#2b244d]/60">
+                          inv.timeline.map((step) => (
+                            <div key={step.id} className="relative group/step bg-[#080612]/70 p-3 rounded-lg border border-[#2b244d]/60">
                               {/* Left dot marker */}
                               <div className={`absolute -left-[22.5px] top-3.5 w-2 h-2 rounded-full border border-[#080612] ${
                                 step.status === "completed"
@@ -2449,8 +2710,9 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                                   <h4 className="font-serif text-xs font-bold text-white group-hover/step:text-[#dfb15b] transition-colors">
                                     {step.title}
                                   </h4>
-                                  <div className="text-[10px] text-purple-300 font-mono">
-                                    📅 {step.date} {step.planetaryTiming && `• 🌙 ${step.planetaryTiming}`}
+                                  <div className="text-[10px] text-purple-300 font-mono flex items-center gap-2">
+                                    <span>📅 Data: <strong>{step.date}</strong></span>
+                                    {step.planetaryTiming && <span>• 🌙 {step.planetaryTiming}</span>}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-1.5">
@@ -2463,6 +2725,16 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                                   }`}>
                                     {step.status === "completed" ? "Fatto" : step.status === "in-progress" ? "In Corso" : "Pianificato"}
                                   </span>
+
+                                  {/* Edit Step Button */}
+                                  <button
+                                    onClick={() => openEditStepModal(step)}
+                                    className="text-gray-400 hover:text-[#dfb15b] p-1 transition-colors"
+                                    title="Modifica Data e Step Operativo"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+
                                   <button
                                     onClick={() => deleteTimelineStep(step.id)}
                                     className="text-gray-600 hover:text-red-400 p-1 opacity-0 group-hover/step:opacity-100 transition-opacity"
@@ -2472,11 +2744,39 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                                   </button>
                                 </div>
                               </div>
-                              <p className="text-xs text-gray-300 mt-1 pl-0.5 leading-relaxed">{step.desc}</p>
+                              <p className="text-xs text-gray-300 mt-1.5 pl-0.5 leading-relaxed font-serif">{step.desc}</p>
                             </div>
                           ))
                         )}
                       </div>
+                    </div>
+
+                    {/* SECTION 8: SIGILLATURA & CHIUSURA DEL FASCICOLO */}
+                    <div className="bg-[#120f24] border border-emerald-500/40 rounded-xl p-4 space-y-3 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-emerald-400 flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-emerald-400" />
+                          <span>8) Sigillatura & Chiusura del Fascicolo d'Indagine</span>
+                        </h3>
+                        <button
+                          onClick={() => generateCaseClosureForInv(inv.id)}
+                          className="text-[10px] text-emerald-300 bg-emerald-950/40 border border-emerald-500/50 px-2.5 py-1 rounded-lg hover:bg-emerald-900/50 font-serif font-semibold"
+                        >
+                          📜 {inv.caseClosureText ? "Aggiorna Chiusura" : "Sigilla Fascicolo"}
+                        </button>
+                      </div>
+
+                      {inv.caseClosureText ? (
+                        <div className="bg-[#080612] border border-emerald-500/30 p-3.5 rounded-lg space-y-2">
+                          <p className="text-xs text-gray-200 font-serif whitespace-pre-wrap leading-relaxed italic">
+                            {inv.caseClosureText}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic bg-[#080612] p-3 rounded-lg border border-[#2b244d]">
+                          Il fascicolo è attualmente in corso di lavorazione. Clicca su 'Sigilla Fascicolo' per generare la dichiarazione solenne di chiusura per il Richiedente e le parti coinvolte.
+                        </p>
+                      )}
                     </div>
 
                     {/* MEDIA ARCHIVE */}
@@ -3472,10 +3772,13 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
             </button>
 
             <div className="border-b border-[#2b244d] pb-2">
-              <h3 className="font-serif text-sm font-bold text-[#dfb15b] tracking-wider">Aggiungi Fase Pratica</h3>
+              <h3 className="font-serif text-sm font-bold text-[#dfb15b] tracking-wider flex items-center gap-2">
+                <PlusCircle className="w-4 h-4" />
+                <span>Aggiungi Fase Pratica</span>
+              </h3>
             </div>
 
-            <div className="space-y-3.5 text-xs font-serif">
+            <div className="space-y-3 text-xs font-serif">
               <div className="space-y-1">
                 <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">Titolo Fase</label>
                 <input
@@ -3485,6 +3788,36 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                   placeholder="Es. Consacrazione dell'Atame o Bando"
                   className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2.5 text-gray-200 focus:border-[#dfb15b] focus:outline-none"
                 />
+              </div>
+
+              {/* Date & Planetary Timing Inputs */}
+              <div className="grid grid-cols-1 gap-2">
+                <div className="space-y-1">
+                  <label className="block text-[#dfb15b] font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-[#dfb15b]" />
+                    <span>Data Scelta Manualmente</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={newStepDate}
+                    onChange={(e) => setNewStepDate(e.target.value)}
+                    className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2 text-gray-200 focus:border-[#dfb15b] focus:outline-none font-mono text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-purple-300 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                    <Moon className="w-3 h-3 text-purple-400" />
+                    <span>Transito Lunare & Planetario</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newStepTiming}
+                    onChange={(e) => setNewStepTiming(e.target.value)}
+                    placeholder="Es. Luna Crescente in Toro • Ora di Venere"
+                    className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2 text-gray-200 focus:border-[#dfb15b] focus:outline-none text-xs"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -3503,10 +3836,10 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
               <div className="space-y-1">
                 <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">Annotazioni Rituali</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={newStepDesc}
                   onChange={(e) => setNewStepDesc(e.target.value)}
-                  placeholder="Indica sensazioni avvertite, corrispondenze utilizzate o transiti orari favorevoli..."
+                  placeholder="Indica sensazioni avvertite, corrispondenze utilizzate..."
                   className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2.5 text-gray-200 focus:border-[#dfb15b] focus:outline-none"
                 />
               </div>
@@ -3518,6 +3851,98 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
               className="w-full bg-[#dfb15b] hover:brightness-110 disabled:brightness-50 text-[#080612] font-serif font-bold py-2.5 rounded-lg text-xs shadow-md active:scale-95 transition-all cursor-pointer"
             >
               Registra nel Fascicolo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* DIALOG STEP TIMELINE EDIT MODAL */}
+      {isEditStepModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[#080612]/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-[#120f24] border border-[#dfb15b]/50 w-full max-w-sm rounded-xl p-4 space-y-4 shadow-2xl relative gold-border-glow">
+            <button
+              onClick={() => setIsEditStepModalOpen(false)}
+              className="absolute top-3.5 right-3.5 text-gray-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="border-b border-[#2b244d] pb-2">
+              <h3 className="font-serif text-sm font-bold text-[#dfb15b] tracking-wider flex items-center gap-2">
+                <Edit3 className="w-4 h-4" />
+                <span>Modifica Step & Calendario</span>
+              </h3>
+            </div>
+
+            <div className="space-y-3 text-xs font-serif">
+              <div className="space-y-1">
+                <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">Titolo Fase</label>
+                <input
+                  type="text"
+                  value={editStepTitle}
+                  onChange={(e) => setEditStepTitle(e.target.value)}
+                  className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2.5 text-gray-200 focus:border-[#dfb15b] focus:outline-none"
+                />
+              </div>
+
+              {/* Manual Date Selection & Planetary Timing */}
+              <div className="grid grid-cols-1 gap-2">
+                <div className="space-y-1">
+                  <label className="block text-[#dfb15b] font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-[#dfb15b]" />
+                    <span>Seleziona Nuova Data (Calendario)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editStepDate}
+                    onChange={(e) => setEditStepDate(e.target.value)}
+                    className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2 text-gray-200 focus:border-[#dfb15b] focus:outline-none font-mono text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-purple-300 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                    <Moon className="w-3 h-3 text-purple-400" />
+                    <span>Timing Lunare / Planetario</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editStepTiming}
+                    onChange={(e) => setEditStepTiming(e.target.value)}
+                    className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2 text-gray-200 focus:border-[#dfb15b] focus:outline-none text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">Stato Operativo</label>
+                <select
+                  value={editStepStatus}
+                  onChange={(e) => setEditStepStatus(e.target.value as any)}
+                  className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2.5 text-gray-200 focus:border-[#dfb15b] focus:outline-none cursor-pointer"
+                >
+                  <option value="planned">Pianificato</option>
+                  <option value="in-progress">In Corso</option>
+                  <option value="completed">Completato (Fatto)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-gray-400 font-bold uppercase tracking-wider text-[10px]">Annotazioni Rituali</label>
+                <textarea
+                  rows={2}
+                  value={editStepDesc}
+                  onChange={(e) => setEditStepDesc(e.target.value)}
+                  className="w-full bg-[#080612] border border-[#2b244d] rounded-lg p-2.5 text-gray-200 focus:border-[#dfb15b] focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={saveEditedTimelineStep}
+              className="w-full bg-[#dfb15b] hover:brightness-110 text-[#080612] font-serif font-bold py-2.5 rounded-lg text-xs shadow-md active:scale-95 transition-all cursor-pointer"
+            >
+              Salva Modifiche Step
             </button>
           </div>
         </div>

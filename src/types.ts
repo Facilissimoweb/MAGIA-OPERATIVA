@@ -9,6 +9,9 @@ export interface Diagnosis {
   title: string;
   archetype: string;
   description: string;
+  startingPoint?: string; // Punto di Partenza (Diagnosi & Squilibrio)
+  targetPoint?: string;   // Punto di Arrivo (Obiettivo Desiderato)
+  rebalancingPlan?: string; // Riequilibrio Operativo
   elements: ElementProfile;
   isFallback?: boolean;
 }
@@ -27,7 +30,7 @@ export interface Ritual {
 export interface InvolvedPerson {
   id: string;
   name: string;
-  role: "Operatore" | "Richiedente" | "Bersaglio" | "Soggetto Coinvolto" | string;
+  role: "Richiedente" | "Target / Bersaglio" | "Operatore" | "Terza Parte" | string;
   birthDate?: string;
   notes?: string;
 }
@@ -50,6 +53,20 @@ export interface ProtectiveBanishment {
   stone: string;
   formula: string;
   steps: string[];
+}
+
+export interface ConsecrationProtocol {
+  title: string;
+  verbalFormula: string;
+  ptahPendulum: {
+    activates: string;
+    dissipates: string;
+  };
+  nubianPyramid: {
+    activates: string;
+    dissipates: string;
+  };
+  cleansingSteps: string[];
 }
 
 export interface TimelineStep {
@@ -84,6 +101,8 @@ export interface Investigation {
   diagnosis?: Diagnosis | null;
   fetishes?: FetishItem[];
   protectiveBanishment?: ProtectiveBanishment | null;
+  consecrationProtocol?: ConsecrationProtocol | null;
+  caseClosureText?: string;
   
   timeline: TimelineStep[];
   media: MediaItem[];
