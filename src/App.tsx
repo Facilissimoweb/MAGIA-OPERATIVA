@@ -129,6 +129,22 @@ export default function App() {
   });
   const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
 
+  // Linked Dossier ID for Egregora Chat
+  const [linkedInvestigationId, setLinkedInvestigationId] = useState<string | null>(null);
+
+  // Dossier Person Form State
+  const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonRole, setNewPersonRole] = useState<string>("Richiedente");
+  const [newPersonBirth, setNewPersonBirth] = useState("");
+  const [newPersonNotes, setNewPersonNotes] = useState("");
+
+  // Dossier Fetish Form State
+  const [newFetishName, setNewFetishName] = useState("");
+  const [newFetishType, setNewFetishType] = useState<"foto" | "testimone_fisico" | "feticcio" | "simulacro_proiettivo">("foto");
+  const [newFetishElement, setNewFetishElement] = useState<"Fuoco" | "Acqua" | "Terra" | "Aria" | "Spirito">("Fuoco");
+  const [newFetishDesc, setNewFetishDesc] = useState("");
+  const [newFetishImgUrl, setNewFetishImgUrl] = useState("");
+
   // Timeline Step Modal State
   const [isStepModalOpen, setIsStepModalOpen] = useState(false);
   const [newStepTitle, setNewStepTitle] = useState("");
@@ -496,6 +512,228 @@ export default function App() {
         return inv;
       })
     );
+  };
+
+  // 10a. Structured Dossier Management Handlers
+  const addInvolvedPersonToInv = (invId: string) => {
+    if (!newPersonName.trim()) return;
+    const newP: InvolvedPerson = {
+      id: `p-${Date.now()}`,
+      name: newPersonName.trim(),
+      role: newPersonRole,
+      birthDate: newPersonBirth.trim() || undefined,
+      notes: newPersonNotes.trim() || undefined
+    };
+
+    setInvestigations(prev => prev.map(inv => {
+      if (inv.id === invId) {
+        const people = [...(inv.involvedPeople || []), newP];
+        return { ...inv, involvedPeople: people };
+      }
+      return inv;
+    }));
+
+    setNewPersonName("");
+    setNewPersonBirth("");
+    setNewPersonNotes("");
+    playKeyClick(500);
+  };
+
+  const removeInvolvedPersonFromInv = (invId: string, personId: string) => {
+    setInvestigations(prev => prev.map(inv => {
+      if (inv.id === invId) {
+        return {
+          ...inv,
+          involvedPeople: (inv.involvedPeople || []).filter(p => p.id !== personId)
+        };
+      }
+      return inv;
+    }));
+  };
+
+  const saveInvestigationQuestion = (invId: string, qText: string) => {
+    setInvestigations(prev => prev.map(inv => {
+      if (inv.id === invId) {
+        return { ...inv, investigationQuestion: qText, description: qText };
+      }
+      return inv;
+    }));
+    playKeyClick(400);
+  };
+
+  const addFetishToInv = (invId: string) => {
+    if (!newFetishName.trim()) return;
+    const newF: FetishItem = {
+      id: `f-${Date.now()}`,
+      name: newFetishName.trim(),
+      type: newFetishType,
+      elementalAffinity: newFetishElement,
+      description: newFetishDesc.trim() || "Testimone o feticcio impiegato nella proiezione energetica.",
+      imageUrl: newFetishImgUrl.trim() || undefined
+    };
+
+    setInvestigations(prev => prev.map(inv => {
+      if (inv.id === invId) {
+        const fetishes = [...(inv.fetishes || []), newF];
+        return { ...inv, fetishes };
+      }
+      return inv;
+    }));
+
+    setNewFetishName("");
+    setNewFetishDesc("");
+    setNewFetishImgUrl("");
+    playKeyClick(500);
+  };
+
+  const removeFetishFromInv = (invId: string, fetishId: string) => {
+    setInvestigations(prev => prev.map(inv => {
+      if (inv.id === invId) {
+        return {
+          ...inv,
+          fetishes: (inv.fetishes || []).filter(f => f.id !== fetishId)
+        };
+      }
+      return inv;
+    }));
+  };
+
+  const generateProtectiveBanishmentForInv = (invId: string) => {
+    const inv = investigations.find(i => i.id === invId);
+    if (!inv) return;
+
+    const opSig = operatorSignature || "Maria Teresa Rogani (Operatore)";
+    const peopleNames = (inv.involvedPeople && inv.involvedPeople.length > 0)
+      ? inv.involvedPeople.map(p => `${p.name} (${p.role})`).join(", ")
+      : "Operatore e Richiedente";
+
+    const newBanish: ProtectiveBanishment = {
+      title: `Bando Preliminare di Protezione Solenne per ${opSig}`,
+      timing: "Da eseguire in Ora di Marte o Saturno, prima di ogni operazione magica o contatto con i feticci",
+      targetProtection: `Schermatura integrale dell'Operatore (${opSig}) e dei soggetti (${peopleNames})`,
+      candle: "Nera o Viola Scuro",
+      incense: "Resina di Mirra, Benzoino e Salvia Bianca",
+      stone: "Tormalina Nera, Ossidiana Nobile o Diaspro Rosso",
+      formula: `Per la virtù del Cerchio Sacro e la sovranità della Volontà Inviolabile, io ${opSig} stabilisco un raggio di protezione impenetrabile attorno al mio tempio e alle parti coinvolte (${peopleNames}). Ogni larva, parassita astrale o influenza ostile è immediatamente bandita e dissolta nell'Aether primordiale. Nessuna forza disarmonica può varcare questa soglia. Così è, così sia.`,
+      steps: [
+        "Traccia un Cerchio di gesso o sale consacrato attorno alla stazione di lavoro.",
+        "Accendi la candela di protezione e brucia suffumigio di Mirra e Salvia Bianca.",
+        "Recita la formula incantatoria con voce ferma e centro addominale contratto.",
+        "Visualizza una sfera di luce bianco-indaco impenetrabile che racchiude l'Operatore e il Richiedente."
+      ]
+    };
+
+    setInvestigations(prev => prev.map(i => {
+      if (i.id === invId) {
+        const hasBanishStep = i.timeline.some(s => s.actionType === "bando_protezione" || s.title.includes("Bando"));
+        let updatedTimeline = i.timeline;
+        if (!hasBanishStep) {
+          updatedTimeline = [
+            ...i.timeline,
+            {
+              id: `st-banish-${Date.now()}`,
+              title: "Bando Preliminare di Protezione",
+              status: "completed",
+              date: new Date().toISOString().split("T")[0],
+              planetaryTiming: "Ora di Marte / Saturno",
+              actionType: "bando_protezione",
+              desc: `Bando di protezione solenne eseguito per ${opSig} e le parti coinvolte.`
+            }
+          ];
+        }
+        return { ...i, protectiveBanishment: newBanish, timeline: updatedTimeline };
+      }
+      return i;
+    }));
+
+    playMysticChime();
+  };
+
+  const calculatePlanetaryDatesForInv = (invId: string) => {
+    const inv = investigations.find(i => i.id === invId);
+    if (!inv) return;
+
+    const baseDate = new Date();
+    
+    const stepTemplates = [
+      {
+        title: "1) Nomi e Dati Soggetti Coinvolti",
+        offsetDays: 0,
+        status: "completed" as const,
+        timing: "Marte / Luna Crescente",
+        desc: `Apertura fascicolo e archiviazione dati anagrafici e simbolici di Operatore e Richiedente.`
+      },
+      {
+        title: "2) Domanda d'Indagine & Formulazione Quesito",
+        offsetDays: 0,
+        status: "completed" as const,
+        timing: "Mercurio / Ora del Sole",
+        desc: `Quesito: "${inv.investigationQuestion || inv.description}"`
+      },
+      {
+        title: "3) Studio del Caso & Diagnosi Alchemica Generata",
+        offsetDays: 1,
+        status: "completed" as const,
+        timing: "Giove / Luna Crescente",
+        desc: `Analisi delle correnti elementali (Archetipo: ${inv.diagnosis?.archetype || inv.archetype}).`
+      },
+      {
+        title: "4) Valutazione Feticci & Simulacri Immaginali",
+        offsetDays: 2,
+        status: "in-progress" as const,
+        timing: "Luna / Ora di Venere",
+        desc: `Preparazione e analisi proiettiva di foto, feticci e testimoni (${inv.fetishes?.length || 0} feticci caricati).`
+      },
+      {
+        title: "5) Bando Preliminare di Protezione",
+        offsetDays: 3,
+        status: "in-progress" as const,
+        timing: "Saturno / Luna Calante",
+        desc: `Consacrazione dello scudo di protezione solenne per Operatore e parti coinvolte.`
+      },
+      {
+        title: "6) Consacrazione Operativa & Carica Sigillo",
+        offsetDays: 5,
+        status: "planned" as const,
+        timing: "Plenilunio / Ora del Sole",
+        desc: `Operazione magica di trasmutazione, carica del sigillo e focalizzazione di trance.`
+      },
+      {
+        title: "7) Sigillatura & Chiusura del Fascicolo",
+        offsetDays: 8,
+        status: "planned" as const,
+        timing: "Giove / Luna Nuova",
+        desc: `Verifica dei frutti manifestati e reintegrazione delle energie nel tempio.`
+      }
+    ];
+
+    const updatedTimeline = stepTemplates.map((tpl, idx) => {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + tpl.offsetDays);
+      const dateStr = d.toISOString().split("T")[0];
+      const lunarInfo = getMoonPhaseData(d);
+
+      return {
+        id: `st-auto-${idx}-${Date.now()}`,
+        title: tpl.title,
+        status: tpl.status,
+        date: dateStr,
+        planetaryTiming: `${tpl.timing} • ${lunarInfo.phaseName} (${lunarInfo.zodiacName.split(" ")[0]})`,
+        desc: tpl.desc
+      };
+    });
+
+    const completedCount = updatedTimeline.filter(s => s.status === "completed").length;
+    const progress = Math.round((completedCount / updatedTimeline.length) * 100);
+
+    setInvestigations(prev => prev.map(i => {
+      if (i.id === invId) {
+        return { ...i, timeline: updatedTimeline, progress };
+      }
+      return i;
+    }));
+
+    playMysticChime();
   };
 
   // 10b. Export & Share functions
@@ -901,13 +1139,42 @@ export default function App() {
     setIsChatting(true);
     playKeyClick(400);
 
+    // Prepare active dossier context if linked or selected
+    const activeInvId = linkedInvestigationId || selectedInvId;
+    const activeInv = activeInvId ? investigations.find(i => i.id === activeInvId) : null;
+
+    let dossierContextPayload = undefined;
+    if (activeInv) {
+      const peopleStr = (activeInv.involvedPeople && activeInv.involvedPeople.length > 0)
+        ? activeInv.involvedPeople.map(p => `${p.name} (${p.role}${p.birthDate ? `, nascita: ${p.birthDate}` : ''})`).join("; ")
+        : "Operatore";
+
+      const fetishesStr = (activeInv.fetishes && activeInv.fetishes.length > 0)
+        ? activeInv.fetishes.map(f => `${f.name} [Tipo: ${f.type}, Elemento: ${f.elementalAffinity || 'N/A'}]: ${f.description}`).join("; ")
+        : "Nessun feticcio/simulacro caricato";
+
+      const protectionStr = activeInv.protectiveBanishment
+        ? `Formula: "${activeInv.protectiveBanishment.formula}" - Target: ${activeInv.protectiveBanishment.targetProtection}`
+        : "Bando preliminare non ancora generato";
+
+      dossierContextPayload = {
+        title: activeInv.title,
+        people: peopleStr,
+        question: activeInv.investigationQuestion || activeInv.description,
+        diagnosis: activeInv.diagnosis ? `${activeInv.diagnosis.archetype}: ${activeInv.diagnosis.description}` : activeInv.archetype,
+        fetishes: fetishesStr,
+        protection: protectionStr
+      };
+    }
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: userMsg.text,
-          history: updatedHistory.slice(-10) // Send last 10 messages context
+          history: updatedHistory.slice(-10),
+          dossierContext: dossierContextPayload
         }),
       });
 
@@ -1037,6 +1304,59 @@ export default function App() {
   };
 
   // PDF Export for chat (Scarica la chat in PDF)
+  const downloadSingleMessagePDF = (msg: ChatMessage) => {
+    try {
+      const doc = new jsPDF();
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(124, 58, 237); // Viola esoterico
+      doc.text("RESPONSO SOLENNE DELL'EGREGORA", 20, 20);
+
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Estratto del responso generato il: ${new Date().toLocaleDateString("it-IT")} alle ${new Date().toLocaleTimeString("it-IT")}`, 20, 26);
+      doc.text(`Operatore: ${operatorSignature}`, 20, 31);
+
+      const activeInvId = linkedInvestigationId || selectedInvId;
+      const activeInv = activeInvId ? investigations.find(i => i.id === activeInvId) : null;
+      let yStart = 37;
+
+      if (activeInv) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(223, 177, 91); // Oro
+        doc.text(`CASO/DOSSIER COLLEGATO: ${activeInv.title} (ID: ${activeInv.id})`, 20, yStart);
+        yStart += 6;
+      }
+
+      doc.setDrawColor(226, 232, 240);
+      doc.line(20, yStart, 190, yStart);
+      yStart += 10;
+
+      let yPos = yStart;
+      doc.setFont("times", "normal");
+      doc.setFontSize(10.5);
+      doc.setTextColor(51, 65, 85);
+
+      const lines = doc.splitTextToSize(msg.text, 170);
+      lines.forEach((line: string) => {
+        if (yPos > 275) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.text(line, 20, yPos);
+        yPos += 5.5;
+      });
+
+      doc.save(`Responso_Egregora_${Date.now()}.pdf`);
+      playMysticChime();
+    } catch (err: any) {
+      console.error("Single message PDF generation failed:", err);
+      alert(`Impossibile generare il PDF: ${err.message || err}`);
+    }
+  };
+
   const downloadChatPDF = () => {
     try {
       const doc = new jsPDF();
@@ -1045,7 +1365,7 @@ export default function App() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
       doc.setTextColor(124, 58, 237); // Colore viola
-      doc.text("IL DIALOGO CON L'EGREGORA", 20, 20);
+      doc.text("IL DIALOGO INTEGRALE CON L'EGREGORA", 20, 20);
 
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
@@ -1053,11 +1373,23 @@ export default function App() {
       doc.text(`Documento ufficiale generato il: ${new Date().toLocaleDateString("it-IT")} alle ${new Date().toLocaleTimeString("it-IT")}`, 20, 26);
       doc.text(`Firma dell'Operatore: ${operatorSignature}`, 20, 31);
 
+      const activeInvId = linkedInvestigationId || selectedInvId;
+      const activeInv = activeInvId ? investigations.find(i => i.id === activeInvId) : null;
+      let yDivider = 35;
+
+      if (activeInv) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(223, 177, 91);
+        doc.text(`DOSSIER ASSOCIATO AL CONTESTO: ${activeInv.title}`, 20, 37);
+        yDivider = 42;
+      }
+
       // Linea divisoria
       doc.setDrawColor(226, 232, 240);
-      doc.line(20, 35, 190, 35);
+      doc.line(20, yDivider, 190, yDivider);
 
-      let yPos = 45;
+      let yPos = yDivider + 10;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
 
@@ -1671,141 +2003,436 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
               (() => {
                 const inv = investigations.find((i) => i.id === selectedInvId);
                 if (!inv) return null;
+                const isLinked = linkedInvestigationId === inv.id;
+
                 return (
-                  <div className="space-y-4 animate-fadeIn">
-                    {/* Back Button and Folder Title */}
-                    <div className="flex items-center space-x-3">
+                  <div className="space-y-5 animate-fadeIn pb-12">
+                    {/* Back Button and Folder Title Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 bg-[#120f24] border border-[#2b244d] p-3 rounded-xl shadow-lg">
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => { setSelectedInvId(null); playKeyClick(300); }}
+                          className="p-2.5 bg-[#080612] border border-[#2b244d] hover:border-[#dfb15b]/60 rounded-lg text-gray-300 hover:text-[#dfb15b] transition-all cursor-pointer"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                        </button>
+                        <div>
+                          <span className="text-[9px] text-[#dfb15b] uppercase tracking-widest font-semibold block">Dossier d'Indagine Operativo</span>
+                          <h2 className="font-serif text-base font-bold text-white">{inv.title}</h2>
+                        </div>
+                      </div>
+
+                      {/* Link to Chat Context Button (Req #9) */}
                       <button
-                        onClick={() => { setSelectedInvId(null); playKeyClick(300); }}
-                        className="p-2.5 bg-[#120f24] border border-[#2b244d] rounded-lg text-gray-300 hover:text-white transition-all shadow-md cursor-pointer"
+                        onClick={() => {
+                          if (isLinked) {
+                            setLinkedInvestigationId(null);
+                          } else {
+                            setLinkedInvestigationId(inv.id);
+                            setIsChatOpen(true);
+                          }
+                          playKeyClick(500);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-serif flex items-center gap-1.5 transition-all cursor-pointer border ${
+                          isLinked
+                            ? "bg-purple-950/60 border-purple-500 text-purple-200 shadow-[0_0_12px_rgba(168,85,247,0.4)]"
+                            : "bg-[#080612] border-[#2b244d] hover:border-[#dfb15b]/60 text-gray-300 hover:text-[#dfb15b]"
+                        }`}
                       >
-                        <ArrowLeft className="w-4 h-4" />
+                        <Sparkles className="w-3.5 h-3.5 text-[#dfb15b]" />
+                        <span>{isLinked ? "Caso Collegato alla Chat (Scollega)" : "Collega Contesto Chat"}</span>
                       </button>
-                      <div>
-                        <span className="text-[9px] text-[#dfb15b] uppercase tracking-widest font-semibold block">Fascicolo d'Indagine</span>
-                        <h2 className="font-serif text-sm md:text-base font-bold text-white">{inv.title}</h2>
-                      </div>
                     </div>
 
-                    {/* Quick Stats Banner */}
+                    {/* QUICK ACTIONS & EXPORT BAR (Req #8) */}
                     <div className="bg-[#120f24] border border-[#2b244d] rounded-xl p-4 space-y-3 shadow-lg">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="px-2.5 py-0.5 bg-[#dfb15b]/10 border border-[#dfb15b]/40 text-[#dfb15b] rounded-full font-serif font-semibold">{inv.archetype}</span>
-                        <span className="font-mono text-gray-400 text-[10px]">Aperto il: {inv.createdDate}</span>
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-1.5">
+                          <Share2 className="w-4 h-4" />
+                          <span>Esportazione Completa Dossier (PDF & Condivisione)</span>
+                        </h3>
+                        <span className="text-[10px] text-gray-400 font-mono">ID: {inv.id}</span>
                       </div>
-                      <p className="text-xs text-gray-300 leading-relaxed italic">"{inv.description}"</p>
 
-                      <div className="space-y-1 pt-2.5 border-t border-[#2b244d]/40">
-                        <div className="flex justify-between text-[11px] font-mono">
-                          <span className="text-gray-400">Progresso Trasmutazione</span>
-                          <span className="text-[#dfb15b] font-bold">{inv.progress}%</span>
-                        </div>
-                        <div className="w-full bg-[#080612] rounded-full h-1.5 overflow-hidden border border-[#2b244d]">
-                          <div className="bg-gradient-to-r from-[#dfb15b] to-[#7c3aed] h-full rounded-full transition-all duration-700" style={{ width: `${inv.progress}%` }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* EXPORT & SHARE ACTIONS */}
-                    <div className="bg-[#120f24] border border-[#2b244d]/80 rounded-xl p-4 space-y-3.5 shadow-lg">
-                      <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-1.5 border-b border-[#2b244d]/60 pb-2">
-                        <Share2 className="w-4 h-4" />
-                        <span>Esporta & Condividi Indagine</span>
-                      </h3>
-                      
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() => { exportTXT(inv); playKeyClick(400); }}
-                          className="bg-[#080612] border border-[#2b244d] hover:border-[#dfb15b]/60 text-gray-300 py-2.5 px-1.5 rounded-lg text-xs flex flex-col items-center justify-center space-y-1 transition-all hover:text-[#dfb15b] cursor-pointer"
-                          title="Scarica documento di testo"
-                        >
-                          <FileText className="w-4 h-4 text-[#dfb15b]" />
-                          <span className="text-[10px] font-serif font-medium">Testo TXT</span>
-                        </button>
-
-                        <button
-                          onClick={() => { exportJSON(inv); playKeyClick(400); }}
-                          className="bg-[#080612] border border-[#2b244d] hover:border-[#dfb15b]/60 text-gray-300 py-2.5 px-1.5 rounded-lg text-xs flex flex-col items-center justify-center space-y-1 transition-all hover:text-[#dfb15b] cursor-pointer"
-                          title="Scarica file di dati JSON"
-                        >
-                          <Download className="w-4 h-4 text-[#dfb15b]" />
-                          <span className="text-[10px] font-serif font-medium">Dati JSON</span>
-                        </button>
-
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <button
                           onClick={() => { exportPDF(inv); playKeyClick(500); }}
-                          className="bg-[#080612] border border-[#2b244d] hover:border-[#dfb15b]/60 text-gray-300 py-2.5 px-1.5 rounded-lg text-xs flex flex-col items-center justify-center space-y-1 transition-all hover:text-[#dfb15b] cursor-pointer"
-                          title="Genera PDF stampabile"
+                          className="bg-[#080612] border border-[#dfb15b]/50 hover:border-[#dfb15b] text-[#dfb15b] py-2.5 px-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 font-serif font-bold transition-all shadow-md cursor-pointer"
                         >
                           <Printer className="w-4 h-4 text-[#dfb15b]" />
-                          <span className="text-[10px] font-serif font-medium">Stampa PDF</span>
+                          <span>Scarica PDF Dossier</span>
                         </button>
-                      </div>
 
-                      {/* OPERATOR SIGNATURE SETTING */}
-                      <div className="bg-[#080612]/70 border border-[#2b244d]/50 p-3 rounded-lg space-y-1.5">
-                        <label className="block text-[10px] text-gray-400 font-mono tracking-widest uppercase">
-                          Firma dell'Operatore / Tarot Italia
-                        </label>
-                        <input
-                          type="text"
-                          value={operatorSignature}
-                          onChange={(e) => {
-                            setOperatorSignature(e.target.value);
-                            playKeyClick(250);
-                          }}
-                          placeholder="Maria Teresa Rogani - Tarot Italia"
-                          className="bg-[#120f24] border border-[#2b244d] hover:border-[#dfb15b]/40 focus:border-[#dfb15b] rounded-lg px-2.5 py-1.5 text-xs text-white w-full outline-none transition-all font-serif"
-                        />
-                        <p className="text-[9px] text-[#dfb15b]/80 italic">
-                          Questa dicitura comparirà come firma ufficiale nei file PDF, TXT, e-mail e WhatsApp.
-                        </p>
-                      </div>
+                        <button
+                          onClick={() => { calculatePlanetaryDatesForInv(inv.id); }}
+                          className="bg-purple-950/30 border border-purple-500/40 hover:border-purple-400 text-purple-200 py-2.5 px-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 font-serif transition-all cursor-pointer"
+                          title="Calcola date ottimali secondo calendario lunare e planetario"
+                        >
+                          <Moon className="w-4 h-4 text-purple-400" />
+                          <span>Calcola Date Luna/Pianeti</span>
+                        </button>
 
-                      <div className="grid grid-cols-2 gap-2.5 pt-1.5 border-t border-[#2b244d]/40">
+                        <button
+                          onClick={() => { exportTXT(inv); playKeyClick(400); }}
+                          className="bg-[#080612] border border-[#2b244d] text-gray-300 py-2.5 px-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 font-serif transition-all hover:text-white cursor-pointer"
+                        >
+                          <FileText className="w-4 h-4 text-[#dfb15b]" />
+                          <span>File TXT</span>
+                        </button>
+
                         <button
                           onClick={() => { shareWhatsApp(inv); playKeyClick(400); }}
-                          className="bg-[#128c7e]/15 border border-[#128c7e]/50 text-[#25d366] hover:bg-[#128c7e]/25 py-2 px-3 rounded-lg text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer font-serif"
+                          className="bg-[#128c7e]/15 border border-[#128c7e]/50 text-[#25d366] py-2.5 px-2 rounded-lg text-xs flex items-center justify-center space-x-1.5 font-serif transition-all cursor-pointer"
                         >
                           <MessageCircle className="w-4 h-4" />
                           <span>WhatsApp</span>
                         </button>
+                      </div>
 
+                      {/* Operator Signature Line */}
+                      <div className="flex items-center space-x-2 pt-2 border-t border-[#2b244d]/40 text-xs">
+                        <span className="text-gray-400 text-[10px] font-mono uppercase">Firma Operatore:</span>
+                        <input
+                          type="text"
+                          value={operatorSignature}
+                          onChange={(e) => setOperatorSignature(e.target.value)}
+                          placeholder="Maria Teresa Rogani - Tarot Italia"
+                          className="bg-[#080612] border border-[#2b244d] focus:border-[#dfb15b] rounded px-2 py-1 text-xs text-white flex-1 outline-none font-serif"
+                        />
+                      </div>
+                    </div>
+
+                    {/* SECTION 1: NOMI E DATI DELLE PERSONE COINVOLTE (Req #1) */}
+                    <div className="bg-[#120f24] border border-[#2b244d] rounded-xl p-4 space-y-3.5 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2.5">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-2">
+                          <Users className="w-4 h-4 text-[#dfb15b]" />
+                          <span>1) Nomi e Dati delle Persone Coinvolte</span>
+                        </h3>
+                        <span className="text-[10px] text-gray-400 font-mono">{(inv.involvedPeople || []).length} soggetti</span>
+                      </div>
+
+                      {/* Display Existing Persons */}
+                      <div className="space-y-2">
+                        {(!inv.involvedPeople || inv.involvedPeople.length === 0) ? (
+                          <p className="text-xs text-gray-500 italic">Nessun soggetto ancora registrato in questo fascicolo.</p>
+                        ) : (
+                          inv.involvedPeople.map((person) => (
+                            <div key={person.id} className="bg-[#080612] border border-[#2b244d] p-3 rounded-lg flex justify-between items-start text-xs">
+                              <div className="space-y-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-serif font-bold text-white text-sm">{person.name}</span>
+                                  <span className="text-[9px] bg-[#dfb15b]/10 border border-[#dfb15b]/40 text-[#dfb15b] px-2 py-0.5 rounded-full uppercase font-mono">{person.role}</span>
+                                </div>
+                                {person.birthDate && (
+                                  <div className="text-[10px] text-gray-400 font-mono">Nascita: {person.birthDate}</div>
+                                )}
+                                {person.notes && (
+                                  <p className="text-gray-300 text-[11px] italic">{person.notes}</p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => removeInvolvedPersonFromInv(inv.id, person.id)}
+                                className="text-gray-500 hover:text-red-400 p-1"
+                                title="Rimuovi Persona"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Add Person Form */}
+                      <div className="bg-[#080612]/60 border border-[#2b244d]/60 p-3 rounded-lg space-y-2 text-xs">
+                        <span className="text-[10px] font-mono text-[#dfb15b] uppercase tracking-wider block">Aggiungi Soggetto al Dossier</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nome Completo / Pseudonimo *"
+                            value={newPersonName}
+                            onChange={(e) => setNewPersonName(e.target.value)}
+                            className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b]"
+                          />
+                          <select
+                            value={newPersonRole}
+                            onChange={(e) => setNewPersonRole(e.target.value)}
+                            className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b]"
+                          >
+                            <option value="Richiedente">Richiedente / Cliente</option>
+                            <option value="Target / Bersaglio">Target / Bersaglio</option>
+                            <option value="Operatore">Operatore dell'Arte</option>
+                            <option value="Terza Parte">Terza Parte Coinvolta</option>
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Data e luogo di nascita (es. 14/05/1988 Roma)"
+                            value={newPersonBirth}
+                            onChange={(e) => setNewPersonBirth(e.target.value)}
+                            className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b]"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Note o dettagli simbolici"
+                            value={newPersonNotes}
+                            onChange={(e) => setNewPersonNotes(e.target.value)}
+                            className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b]"
+                          />
+                        </div>
                         <button
-                          onClick={() => { shareEmail(inv); playKeyClick(400); }}
-                          className="bg-indigo-950/25 border border-indigo-500/35 text-indigo-300 hover:bg-indigo-950/40 py-2 px-3 rounded-lg text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer font-serif"
+                          onClick={() => addInvolvedPersonToInv(inv.id)}
+                          className="w-full bg-[#dfb15b]/20 border border-[#dfb15b]/50 text-[#dfb15b] py-1.5 rounded font-serif text-xs font-semibold hover:bg-[#dfb15b]/30 transition-all cursor-pointer"
                         >
-                          <Mail className="w-4 h-4" />
-                          <span>Invia Email</span>
+                          + Inserisci Soggetto nel Fascicolo
                         </button>
                       </div>
                     </div>
 
-                    {/* TIMELINE TIMESTAMPS */}
+                    {/* SECTION 2: LA MIA DOMANDA D'INDAGINE (Req #2 - Immediately following involved persons) */}
+                    <div className="bg-[#120f24] border border-amber-500/40 rounded-xl p-4 space-y-3 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-amber-400 flex items-center gap-2">
+                          <HelpCircle className="w-4 h-4 text-amber-400" />
+                          <span>2) Domanda d'Indagine dell'Operatore</span>
+                        </h3>
+                        <span className="text-[9px] text-amber-400/80 font-mono uppercase">Formulazione Quesito</span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <textarea
+                          value={inv.investigationQuestion || inv.description}
+                          onChange={(e) => saveInvestigationQuestion(inv.id, e.target.value)}
+                          placeholder="Inserisci qui il quesito centrale d'indagine..."
+                          rows={3}
+                          className="w-full bg-[#080612] border border-[#2b244d] focus:border-amber-400 rounded-lg p-3 text-xs text-amber-100 outline-none font-serif leading-relaxed"
+                        />
+                        <p className="text-[10px] text-gray-400 italic">
+                          Il quesito d'indagine viene inviato direttamente all'Egregora nella chat e incluso nell'intestazione del PDF.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: RISPOSTA ANALIZZATA E GENERATA NELLA TIMELINE (Req #3) */}
+                    <div className="bg-[#120f24] border border-purple-500/40 rounded-xl p-4 space-y-3 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-purple-300 flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4 text-purple-400" />
+                          <span>3) Risposta Analizzata e Generata dall'Egregora</span>
+                        </h3>
+                        <button
+                          onClick={() => {
+                            setLinkedInvestigationId(inv.id);
+                            setIsChatOpen(true);
+                            playKeyClick(400);
+                          }}
+                          className="text-[10px] text-purple-300 bg-purple-900/40 border border-purple-500/50 px-2.5 py-1 rounded-lg hover:bg-purple-800/50 font-serif"
+                        >
+                          Apri Chat Egregora →
+                        </button>
+                      </div>
+
+                      <div className="bg-[#080612] border border-[#2b244d] p-3 rounded-lg space-y-2">
+                        {chatHistory.length > 1 ? (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-mono text-purple-400 uppercase">Ultimo responso salvato dalla chat:</span>
+                            <p className="text-xs text-gray-200 font-serif line-clamp-4 italic bg-[#120f24] p-2.5 rounded border border-[#2b244d]/80">
+                              "{chatHistory.filter(m => m.role === 'model').slice(-1)[0]?.text || "In attesa di consulto..."}"
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">
+                            Nessuna risposta analizzata in chat per questo fascicolo. Clicca su 'Apri Chat Egregora' in alto per iniziare.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* SECTION 4: APERTURA FASCICOLO E DIAGNOSI (Req #4) */}
+                    <div className="bg-[#120f24] border border-[#2b244d] rounded-xl p-4 space-y-3.5 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[#dfb15b]" />
+                          <span>4) Apertura Fascicolo e Diagnosi Alchemica del Caso</span>
+                        </h3>
+                        <span className="text-[10px] text-[#dfb15b] font-mono font-bold uppercase">{inv.archetype}</span>
+                      </div>
+
+                      {inv.diagnosis ? (
+                        <div className="bg-[#080612] border border-[#2b244d] p-3 rounded-lg space-y-2">
+                          <p className="text-xs text-gray-300 italic">{inv.diagnosis.description}</p>
+                          <div className="grid grid-cols-4 gap-2 pt-2 border-t border-[#2b244d]/40 text-center font-mono text-[10px]">
+                            <div className="bg-red-950/20 border border-red-500/30 p-1.5 rounded text-red-300">🔥 Fuoco {inv.diagnosis.elements.fire}%</div>
+                            <div className="bg-blue-950/20 border border-blue-500/30 p-1.5 rounded text-blue-300">💧 Acqua {inv.diagnosis.elements.water}%</div>
+                            <div className="bg-amber-950/20 border border-amber-500/30 p-1.5 rounded text-amber-300">⛰️ Terra {inv.diagnosis.elements.earth}%</div>
+                            <div className="bg-sky-950/20 border border-sky-500/30 p-1.5 rounded text-sky-300">💨 Aria {inv.diagnosis.elements.air}%</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-[#080612] border border-[#2b244d] p-3 rounded-lg text-xs text-gray-400 italic">
+                          Fascicolo aperto sotto l'archetipo {inv.archetype}. Diagnosi elementale predefinita in corso.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECTION 5: VALUTAZIONE FETICCI, FOTO E SIMULACRI IMMAGINALI (Req #5) */}
+                    <div className="bg-[#120f24] border border-[#2b244d] rounded-xl p-4 space-y-3.5 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2.5">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-2">
+                          <Eye className="w-4 h-4 text-[#dfb15b]" />
+                          <span>5) Valutazione Feticci, Foto e Simulacri Immaginali</span>
+                        </h3>
+                        <span className="text-[10px] text-gray-400 font-mono">{(inv.fetishes || []).length} feticci</span>
+                      </div>
+
+                      {/* Fetish List */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {(!inv.fetishes || inv.fetishes.length === 0) ? (
+                          <p className="col-span-2 text-xs text-gray-500 italic">Nessun feticcio, foto o testimone immaginale ancora caricato.</p>
+                        ) : (
+                          inv.fetishes.map((fetish) => (
+                            <div key={fetish.id} className="bg-[#080612] border border-[#2b244d] p-3 rounded-lg space-y-1.5 text-xs relative">
+                              <button
+                                onClick={() => removeFetishFromInv(inv.id, fetish.id)}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-red-400 p-1"
+                                title="Rimuovi Feticcio"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <div className="flex items-center space-x-2">
+                                <span className="font-serif font-bold text-white">{fetish.name}</span>
+                                <span className="text-[8px] uppercase bg-purple-950/60 border border-purple-500/40 text-purple-300 px-1.5 py-0.5 rounded font-mono">{fetish.type}</span>
+                              </div>
+                              <div className="text-[10px] text-[#dfb15b] font-mono">Affinità: {fetish.elementalAffinity || 'Aether'}</div>
+                              <p className="text-gray-300 text-[11px] leading-relaxed">{fetish.description}</p>
+                              {fetish.imageUrl && (
+                                <img src={fetish.imageUrl} alt={fetish.name} className="w-full h-20 object-cover rounded border border-[#2b244d] mt-1" />
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Add Fetish Form */}
+                      <div className="bg-[#080612]/60 border border-[#2b244d]/60 p-3 rounded-lg space-y-2 text-xs">
+                        <span className="text-[10px] font-mono text-[#dfb15b] uppercase tracking-wider block">Registra Feticcio / Foto / Testimone</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nome Feticcio / Foto *"
+                            value={newFetishName}
+                            onChange={(e) => setNewFetishName(e.target.value)}
+                            className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b]"
+                          />
+                          <select
+                            value={newFetishType}
+                            onChange={(e) => setNewFetishType(e.target.value as any)}
+                            className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b]"
+                          >
+                            <option value="foto">Foto della Persona</option>
+                            <option value="testimone_fisico">Testimone Fisico (Capelli/Firma)</option>
+                            <option value="feticcio">Feticcio / Doliola di Cera</option>
+                            <option value="simulacro_proiettivo">Simulacro Immaginale Proiettivo</option>
+                          </select>
+                          <select
+                            value={newFetishElement}
+                            onChange={(e) => setNewFetishElement(e.target.value as any)}
+                            className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b]"
+                          >
+                            <option value="Fuoco">🔥 Fuoco</option>
+                            <option value="Acqua">💧 Acqua</option>
+                            <option value="Terra">⛰️ Terra</option>
+                            <option value="Aria">💨 Aria</option>
+                            <option value="Spirito">✨ Spirito / Aether</option>
+                          </select>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Descrizione proiettiva (es. foto caricata con intenti di trasmutazione)"
+                          value={newFetishDesc}
+                          onChange={(e) => setNewFetishDesc(e.target.value)}
+                          className="bg-[#120f24] border border-[#2b244d] rounded p-2 text-white outline-none focus:border-[#dfb15b] w-full"
+                        />
+                        <button
+                          onClick={() => addFetishToInv(inv.id)}
+                          className="w-full bg-[#dfb15b]/20 border border-[#dfb15b]/50 text-[#dfb15b] py-1.5 rounded font-serif text-xs font-semibold hover:bg-[#dfb15b]/30 transition-all cursor-pointer"
+                        >
+                          + Registra Feticcio nel Fascicolo
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* SECTION 6: BANDO PRELIMINARE DI PROTEZIONE (Req #6) */}
+                    <div className="bg-[#120f24] border border-purple-500/40 rounded-xl p-4 space-y-3 shadow-lg">
+                      <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-2">
+                        <h3 className="font-serif text-xs md:text-sm font-bold text-purple-300 flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-purple-400" />
+                          <span>6) Bando Preliminare di Protezione (Operatore e Parti)</span>
+                        </h3>
+                        <button
+                          onClick={() => generateProtectiveBanishmentForInv(inv.id)}
+                          className="text-[10px] text-purple-200 bg-purple-900/50 border border-purple-500 px-2.5 py-1 rounded-lg hover:bg-purple-800 font-serif font-semibold"
+                        >
+                          ⚡ {inv.protectiveBanishment ? "Rigenera Bando" : "Genera Bando Solenne"}
+                        </button>
+                      </div>
+
+                      {inv.protectiveBanishment ? (
+                        <div className="bg-[#080612] border border-purple-500/30 p-3.5 rounded-lg space-y-2 text-xs">
+                          <h4 className="font-serif font-bold text-purple-300 text-sm">{inv.protectiveBanishment.title}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-gray-300 font-mono">
+                            <div> Timing: <span className="text-purple-200">{inv.protectiveBanishment.timing}</span></div>
+                            <div> Targets: <span className="text-purple-200">{inv.protectiveBanishment.targetProtection}</span></div>
+                            <div> Corrispondenze: Candela {inv.protectiveBanishment.candle}, Incenso {inv.protectiveBanishment.incense}</div>
+                          </div>
+                          <div className="bg-purple-950/30 border-l-2 border-purple-500 p-2.5 rounded text-purple-100 font-serif italic text-xs leading-relaxed">
+                            "{inv.protectiveBanishment.formula}"
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic bg-[#080612] p-3 rounded-lg border border-[#2b244d]">
+                          Nessun bando di protezione solenne ancora generato. Clicca su 'Genera Bando Solenne' per consacrare lo scudo di schermatura per Operatore e soggetti coinvolti.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* SECTION 7: TIMELINE DEGLI STEP OPERATIVI E TIMING LUNARE/PLANETARIO (Req #7) */}
                     <div className="bg-[#120f24] border border-[#2b244d] rounded-xl p-4 space-y-4 shadow-lg">
                       <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-3">
                         <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-1.5">
                           <Clock className="w-4 h-4" />
-                          <span>Timeline degli Step Operativi</span>
+                          <span>7) Timeline degli Step Operativi (Calcolo Lunare & Planetario)</span>
                         </h3>
-                        <button
-                          onClick={() => setIsStepModalOpen(true)}
-                          className="text-[10px] text-[#dfb15b] bg-[#dfb15b]/10 border border-[#dfb15b]/40 px-2.5 py-1 rounded-lg hover:bg-[#dfb15b]/20 flex items-center gap-1 cursor-pointer font-serif uppercase tracking-widest"
-                        >
-                          <PlusCircle className="w-3.5 h-3.5" />
-                          <span>Fase</span>
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => calculatePlanetaryDatesForInv(inv.id)}
+                            className="text-[10px] text-purple-300 bg-purple-950/40 border border-purple-500/50 px-2 py-1 rounded-lg hover:bg-purple-900/50 flex items-center gap-1 cursor-pointer font-serif"
+                            title="Calcola in autonomia le date migliori per tutti gli step"
+                          >
+                            <Moon className="w-3 h-3" />
+                            <span>Auto-Calcola Date</span>
+                          </button>
+                          <button
+                            onClick={() => setIsStepModalOpen(true)}
+                            className="text-[10px] text-[#dfb15b] bg-[#dfb15b]/10 border border-[#dfb15b]/40 px-2 py-1 rounded-lg hover:bg-[#dfb15b]/20 flex items-center gap-1 cursor-pointer font-serif uppercase tracking-widest"
+                          >
+                            <PlusCircle className="w-3 h-3" />
+                            <span>Aggiungi Fase</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Timeline Steps Display */}
-                      <div className="relative pl-5 py-1 space-y-5 before:absolute before:left-[7px] before:top-2.5 before:bottom-2.5 before:w-[1px] before:bg-[#2b244d]">
+                      <div className="relative pl-5 py-1 space-y-4 before:absolute before:left-[7px] before:top-2.5 before:bottom-2.5 before:w-[1px] before:bg-[#2b244d]">
                         {inv.timeline.length === 0 ? (
-                          <p className="text-xs text-gray-500 italic pl-2">Nessun passaggio ritmico registrato. Clicca su 'Aggiungi Fase' in alto.</p>
+                          <p className="text-xs text-gray-500 italic pl-2">Nessun passaggio ritmico registrato. Clicca su 'Auto-Calcola Date' per popolare la timeline.</p>
                         ) : (
-                          inv.timeline.map((step) => (
-                            <div key={step.id} className="relative group/step">
+                          inv.timeline.map((step, idx) => (
+                            <div key={step.id} className="relative group/step bg-[#080612]/70 p-2.5 rounded-lg border border-[#2b244d]/60">
                               {/* Left dot marker */}
-                              <div className={`absolute -left-[22.5px] top-1.5 w-2 h-2 rounded-full border border-[#080612] ${
+                              <div className={`absolute -left-[22.5px] top-3.5 w-2 h-2 rounded-full border border-[#080612] ${
                                 step.status === "completed"
                                   ? "bg-emerald-500 shadow-[0_0_6px_#10b981]"
                                   : step.status === "in-progress"
@@ -1815,8 +2442,12 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
 
                               <div className="flex justify-between items-start">
                                 <div className="space-y-0.5">
-                                  <h4 className="font-serif text-xs font-bold text-white group-hover/step:text-[#dfb15b] transition-colors">{step.title}</h4>
-                                  <span className="text-[9px] text-gray-500 font-mono block">{step.date}</span>
+                                  <h4 className="font-serif text-xs font-bold text-white group-hover/step:text-[#dfb15b] transition-colors">
+                                    {step.title}
+                                  </h4>
+                                  <div className="text-[10px] text-purple-300 font-mono">
+                                    📅 {step.date} {step.planetaryTiming && `• 🌙 ${step.planetaryTiming}`}
+                                  </div>
                                 </div>
                                 <div className="flex items-center space-x-1.5">
                                   <span className={`text-[8px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${
@@ -1849,7 +2480,7 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                       <div className="flex justify-between items-center border-b border-[#2b244d]/60 pb-3">
                         <h3 className="font-serif text-xs md:text-sm font-bold text-[#dfb15b] flex items-center gap-1.5">
                           <FolderOpen className="w-4 h-4" />
-                          <span>Prove e Allegati Multimediali</span>
+                          <span>Allegati e Documenti Multimediali</span>
                         </h3>
                         <label className="cursor-pointer text-[10px] bg-[#7c3aed]/20 border border-[#7c3aed]/60 text-purple-200 px-2.5 py-1 rounded-lg hover:bg-[#7c3aed]/35 flex items-center gap-1 font-serif uppercase tracking-widest">
                           <Upload className="w-3.5 h-3.5" />
@@ -2162,6 +2793,24 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
               </div>
             </div>
 
+            {/* Linked Dossier Context Banner */}
+            {(linkedInvestigationId || selectedInvId) && (
+              <div className="px-4 py-2 bg-[#dfb15b]/10 border-b border-[#dfb15b]/30 flex items-center justify-between text-xs text-[#dfb15b] font-serif">
+                <div className="flex items-center gap-2 truncate">
+                  <Link className="w-4 h-4 shrink-0 text-[#dfb15b]" />
+                  <span className="truncate">Contesto Attivo: <strong>{investigations.find(i => i.id === (linkedInvestigationId || selectedInvId))?.title || "Dossier Selezionato"}</strong></span>
+                </div>
+                {linkedInvestigationId && (
+                  <button
+                    onClick={() => setLinkedInvestigationId(null)}
+                    className="text-[10px] text-gray-400 hover:text-white underline shrink-0 ml-2 cursor-pointer font-sans"
+                  >
+                    Scollega
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Chat list */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4 text-sm bg-[#0b081a]/30" id="fullpage-chat-container">
               {chatHistory.map((msg) => (
@@ -2181,17 +2830,28 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                   }`}>
                     {msg.text}
                     
-                    {/* TTS controls */}
+                    {/* Controls for model response */}
                     {msg.role === "model" && !msg.isError && (
-                      <div className="mt-2 flex justify-end">
+                      <div className="mt-3 pt-2 border-t border-[#2b244d]/60 flex items-center justify-end gap-2 text-xs">
+                        <button
+                          onClick={() => downloadSingleMessagePDF(msg)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#120f24] hover:bg-[#dfb15b]/15 text-[#dfb15b] border border-[#2b244d] hover:border-[#dfb15b]/50 transition-all cursor-pointer font-sans text-[11px]"
+                          title="Scarica questa risposta in PDF"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>PDF Risposta</span>
+                        </button>
                         <button
                           onClick={() => speakMessage(msg.text, msg.id)}
-                          className={`p-1.5 rounded-md text-gray-400 hover:text-[#dfb15b] transition-all cursor-pointer ${
-                            speakingMessageId === msg.id ? "text-amber-400 bg-white/5 animate-pulse" : "hover:bg-white/5"
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded border transition-all cursor-pointer font-sans text-[11px] ${
+                            speakingMessageId === msg.id 
+                              ? "bg-amber-500/20 text-amber-300 border-amber-500 animate-pulse" 
+                              : "bg-[#120f24] text-gray-400 hover:text-gray-200 border-[#2b244d]"
                           }`}
                           title={speakingMessageId === msg.id ? "Ferma Lettura" : "Ascolta Risposta"}
                         >
-                          {speakingMessageId === msg.id ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                          {speakingMessageId === msg.id ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                          <span>{speakingMessageId === msg.id ? "Stop" : "Ascolta"}</span>
                         </button>
                       </div>
                     )}
@@ -2899,6 +3559,24 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
               </div>
             </div>
 
+            {/* Linked Dossier Context Banner in Floating Chat */}
+            {(linkedInvestigationId || selectedInvId) && (
+              <div className="px-3 py-1.5 bg-[#dfb15b]/10 border-b border-[#dfb15b]/30 flex items-center justify-between text-[11px] text-[#dfb15b] font-serif shrink-0">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Link className="w-3.5 h-3.5 shrink-0 text-[#dfb15b]" />
+                  <span className="truncate">Caso: <strong>{investigations.find(i => i.id === (linkedInvestigationId || selectedInvId))?.title || "Dossier Selezionato"}</strong></span>
+                </div>
+                {linkedInvestigationId && (
+                  <button
+                    onClick={() => setLinkedInvestigationId(null)}
+                    className="text-[9px] text-gray-400 hover:text-white underline shrink-0 ml-1 cursor-pointer font-sans"
+                  >
+                    Scollega
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Chat List */}
             <div className="flex-1 p-3.5 sm:p-3 overflow-y-auto space-y-3.5 text-xs bg-[#0b081a]/40" id="chat-messages-container">
               {chatHistory.map((msg) => (
@@ -2918,18 +3596,29 @@ Fornisci una risposta formattata splendidamente in Italiano con un tono estremam
                   }`}>
                     {msg.text}
                     
-                    {/* TTS controls */}
+                    {/* Controls for model response */}
                     {msg.role === "model" && !msg.isError && (
-                      <div className="mt-2 flex justify-end">
+                      <div className="mt-2 pt-1.5 border-t border-[#2b244d]/50 flex items-center justify-end gap-1.5 text-[10px]">
+                        <button
+                          onClick={() => downloadSingleMessagePDF(msg)}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#120f24] hover:bg-[#dfb15b]/15 text-[#dfb15b] border border-[#2b244d] hover:border-[#dfb15b]/50 transition-all cursor-pointer font-sans"
+                          title="Scarica questo responso in PDF"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>PDF Risposta</span>
+                        </button>
                         <button
                           onClick={() => speakMessage(msg.text, msg.id)}
-                          className={`p-1 rounded text-gray-400 hover:text-[#dfb15b] transition-all cursor-pointer ${
-                            speakingMessageId === msg.id ? "text-amber-400 animate-pulse bg-white/5" : ""
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all cursor-pointer font-sans ${
+                            speakingMessageId === msg.id 
+                              ? "bg-amber-500/20 text-amber-300 border-amber-500 animate-pulse" 
+                              : "bg-[#120f24] text-gray-400 hover:text-gray-200 border-[#2b244d]"
                           }`}
                           title={speakingMessageId === msg.id ? "Ferma Lettura" : "Ascolta Risposta"}
                           id={`btn-tts-${msg.id}`}
                         >
-                          {speakingMessageId === msg.id ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                          {speakingMessageId === msg.id ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                          <span>{speakingMessageId === msg.id ? "Stop" : "Ascolta"}</span>
                         </button>
                       </div>
                     )}

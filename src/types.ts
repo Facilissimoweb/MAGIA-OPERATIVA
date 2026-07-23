@@ -24,12 +24,42 @@ export interface Ritual {
   isFallback?: boolean;
 }
 
+export interface InvolvedPerson {
+  id: string;
+  name: string;
+  role: "Operatore" | "Richiedente" | "Bersaglio" | "Soggetto Coinvolto" | string;
+  birthDate?: string;
+  notes?: string;
+}
+
+export interface FetishItem {
+  id: string;
+  name: string;
+  type: "foto" | "testimone_fisico" | "feticcio" | "simulacro_proiettivo";
+  description: string;
+  imageUrl?: string;
+  elementalAffinity?: "Fuoco" | "Acqua" | "Terra" | "Aria" | "Spirito" | string;
+}
+
+export interface ProtectiveBanishment {
+  title: string;
+  timing: string;
+  targetProtection: string;
+  candle: string;
+  incense: string;
+  stone: string;
+  formula: string;
+  steps: string[];
+}
+
 export interface TimelineStep {
   id: string;
   title: string;
   status: "planned" | "in-progress" | "completed";
   date: string;
+  planetaryTiming?: string;
   desc: string;
+  actionType?: "apertura" | "diagnosi" | "feticci" | "bando_protezione" | "operazione" | "risposta_analizzata" | string;
 }
 
 export interface MediaItem {
@@ -47,6 +77,14 @@ export interface Investigation {
   description: string;
   createdDate: string;
   progress: number;
+  
+  // Structured Investigation Dossier Fields
+  involvedPeople?: InvolvedPerson[];
+  investigationQuestion?: string;
+  diagnosis?: Diagnosis | null;
+  fetishes?: FetishItem[];
+  protectiveBanishment?: ProtectiveBanishment | null;
+  
   timeline: TimelineStep[];
   media: MediaItem[];
 }
